@@ -17,8 +17,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "mypy==1.18.2",
   "pytest==8.3.5",
   "ruff==0.11.5",
+  "types-requests==2.32.4.20250913",
 ]
 
 [project.scripts]
@@ -36,3 +38,17 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[[tool.mypy.overrides]]
+module = [
+  "openpyxl",
+  "openpyxl.*",
+  "rsa",
+  "tqdm",
+  "tqdm.*",
+]
+ignore_missing_imports = true

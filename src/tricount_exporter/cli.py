@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import openpyxl
 import requests
@@ -51,7 +51,7 @@ def load_tricount_info(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
     except json.JSONDecodeError:
         return None
 
@@ -145,13 +145,13 @@ class TricountAPI:
         )
         response = requests.get(tricount_url, headers=self.headers, timeout=30)
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
 
 class TricountHandler:
     @staticmethod
     def get_tricount_title(data: dict[str, Any]) -> str:
-        return data["Response"][0]["Registry"]["title"]
+        return cast(str, data["Response"][0]["Registry"]["title"])
 
     @staticmethod
     def parse_tricount_data(

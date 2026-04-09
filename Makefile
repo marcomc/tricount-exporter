@@ -2,7 +2,6 @@ SHELL := /bin/zsh
 VENV := .venv
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
-PACKAGE := tricount_exporter
 MARKDOWN_FILES := README.md CHANGELOG.md TODO.md AGENTS.md
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
@@ -12,12 +11,11 @@ CONFIG_DIR ?= $(HOME)/.config/tricount-exporter
 CONFIG_PATH ?= $(CONFIG_DIR)/config.toml
 APP_HOME ?= $(HOME)/.local/share/$(INSTALL_NAME)
 APP_VENV ?= $(APP_HOME)/venv
-APP_PY ?= $(APP_VENV)/bin/python
 APP_PIP ?= $(APP_VENV)/bin/pip
 
 .DEFAULT_GOAL := help
 
-.PHONY: help check-deps venv app-venv install install-dev install-link install-config uninstall lint test run clean
+.PHONY: help check-deps venv app-venv install install-dev install-link install-config uninstall lint test check run clean
 
 help: ## Show available targets
 	@awk 'BEGIN { FS = ":.*##" } /^[a-zA-Z_-]+:.*##/ { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -79,16 +77,19 @@ uninstall: ## Remove the linked CLI and standalone runtime environment
 	@echo "Removed $(INSTALL_PATH)"
 
 lint: install-dev ## Run Python and Markdown checks
-	$(PY) -m ruff check src tests main.py
-	$(PY) -m ruff format --check src tests main.py
+	$(PY) -m ruff check src tests
+	$(PY) -m ruff format --check src tests
+	$(PY) -m mypy src
 	markdownlint --config .markdownlint.json $(MARKDOWN_FILES)
 	shellcheck --enable=all scripts/*.sh
 
 test: install-dev ## Run regression tests
 	$(PY) -m pytest -q
 
+check: lint test ## Run the full maintainer quality gate
+
 run: install ## Show CLI help
 	"$(INSTALL_PATH)" --help
 
 clean: ## Remove local build and virtualenv artifacts
-	rm -rf $(VENV) .ruff_cache build dist src/*.egg-info(N) *.egg-info(N)
+	rm -rf $(VENV) .mypy_cache .ruff_cache build dist src/*.egg-info(N) *.egg-info(N)

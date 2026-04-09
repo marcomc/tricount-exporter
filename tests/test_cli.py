@@ -165,6 +165,56 @@ def test_cli_reads_key_from_config(
     assert not (export_dir / "Attachments City-trip").exists()
 
 
+def test_load_config_expands_home_in_output_dir(
+    monkeypatch, tmp_path: Path, config_path: Path
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    config_path.write_text('output_dir = "~/Exports"\n', encoding="utf-8")
+
+    loaded = cli.load_config(config_path)
+
+    assert loaded.output_dir == tmp_path / "Exports"
+
+
+def test_resolve_settings_prefers_cli_flags_over_config(config_path: Path, tmp_path: Path) -> None:
+    config_path.write_text(
+        "\n".join(
+            [
+                'tricount_key = "config-key"',
+                'output_dir = "/tmp/from-config"',
+                "download_attachments = true",
+                "write_excel = false",
+                "write_sesterce = false",
+                "save_response = false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    args = cli.build_parser().parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--key",
+            "cli-key",
+            "--output-dir",
+            str(tmp_path),
+            "--no-download-attachments",
+            "--write-excel",
+            "--write-sesterce",
+            "--save-response",
+        ]
+    )
+
+    settings = cli.resolve_settings(args)
+
+    assert settings.tricount_key == "cli-key"
+    assert settings.output_dir == tmp_path
+    assert settings.download_attachments is False
+    assert settings.write_excel is True
+    assert settings.write_sesterce is True
+    assert settings.save_response is True
+
+
 def test_resolve_export_directory_reuses_same_title_for_same_key(tmp_path: Path) -> None:
     export_dir = tmp_path / "City-trip"
     export_dir.mkdir()

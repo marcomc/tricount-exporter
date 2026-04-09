@@ -22,7 +22,7 @@ smallest maintained surface that serves the rewritten CLI.
 - Project name: `tricount-exporter`
 - Python package: `tricount_exporter`
 - Installed CLI: `tricount-exporter`
-- Compatibility entry point still present: `python main.py`
+- Module entry point: `python -m tricount_exporter`
 - Default user config path: `~/.config/tricount-exporter/config.toml`
 - Default runtime install path: `~/.local/share/tricount-exporter/venv`
 - Default output base directory: `~/Downloads`
@@ -86,6 +86,8 @@ Rules:
   - source URL
 - If two different Tricounts resolve to the same sanitized title, the second
   export directory gets a short key suffix, for example `City-trip-987654`.
+- If that suffix is already taken by a different Tricount, increment with
+  `-2`, `-3`, and so on until a free or matching directory is found.
 - If the existing title directory already belongs to the same key, it is reused.
 
 ## API Notes
@@ -181,12 +183,12 @@ If changing packaging, preserve the standalone runtime behavior of
 
 Minimum checks expected after code or doc changes:
 
-- `make lint`
-- `make test`
+- `make check`
 
 Current quality tooling:
 
 - Ruff for Python linting and formatting checks
+- MyPy for Python static typing
 - `pytest` for regression tests
 - `markdownlint` for Markdown
 - `shellcheck --enable=all` for shell scripts
@@ -215,6 +217,8 @@ The tests currently cover:
 - optional raw-response save
 - disabling attachments
 - reading defaults from config
+- `~` expansion for config-based output directories
+- CLI override precedence over config values
 - export directory reuse for the same title and key
 - collision suffixing for different keys with the same title
 
@@ -244,7 +248,6 @@ The roadmap is tracked in
 
 The most important pending areas are:
 
-- remove remaining compatibility surface inherited from the upstream fork
 - strengthen Python quality automation further
 - add a dry-run mode
 - explore whether the Tricount API exposes account-wide discovery
@@ -258,6 +261,7 @@ Before implementing changes:
 - read `README.md`
 - read `TODO.md`
 - inspect `src/tricount_exporter/cli.py`
+- inspect `src/tricount_exporter/__main__.py`
 - inspect `tests/test_cli.py`
 
 When updating behavior:
