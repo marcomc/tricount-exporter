@@ -187,3 +187,31 @@ def test_resolve_export_directory_adds_suffix_for_title_collision(tmp_path: Path
     resolved = cli.resolve_export_directory(tmp_path, "City trip", "second-key-987654")
 
     assert resolved == tmp_path / "City-trip-987654"
+
+
+def test_resolve_export_directory_keeps_searching_when_suffix_is_taken(tmp_path: Path) -> None:
+    first_dir = tmp_path / "City-trip"
+    first_dir.mkdir()
+    (first_dir / cli.INFO_FILE_NAME).write_text(
+        json.dumps({"tricount_key": "first-key"}), encoding="utf-8"
+    )
+
+    second_dir = tmp_path / "City-trip-987654"
+    second_dir.mkdir()
+    (second_dir / cli.INFO_FILE_NAME).write_text(
+        json.dumps({"tricount_key": "second-key-987654"}), encoding="utf-8"
+    )
+
+    resolved = cli.resolve_export_directory(tmp_path, "City trip", "third-key-987654")
+
+    assert resolved == tmp_path / "City-trip-987654-2"
+
+
+def test_resolve_export_directory_ignores_invalid_metadata_for_reuse(tmp_path: Path) -> None:
+    export_dir = tmp_path / "City-trip"
+    export_dir.mkdir()
+    (export_dir / cli.INFO_FILE_NAME).write_text("{invalid json", encoding="utf-8")
+
+    resolved = cli.resolve_export_directory(tmp_path, "City trip", "key-123456")
+
+    assert resolved == tmp_path / "City-trip-123456"

@@ -50,22 +50,34 @@ def current_timestamp() -> str:
 def load_tricount_info(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def directory_matches_tricount_key(directory: Path, tricount_key: str) -> bool:
+    info = load_tricount_info(directory / INFO_FILE_NAME)
+    return bool(info and info.get("tricount_key") == tricount_key)
 
 
 def resolve_export_directory(base_output_dir: Path, title: str, tricount_key: str) -> Path:
     base_name = sanitize_path_component(title)
-    candidate = base_output_dir / base_name
     short_key = sanitize_path_component(tricount_key)[-6:]
+    suffix_index = 0
 
-    if not candidate.exists():
-        return candidate
+    while True:
+        suffix = ""
+        if suffix_index >= 1:
+            suffix = f"-{short_key}"
+        if suffix_index >= 2:
+            suffix = f"-{short_key}-{suffix_index}"
 
-    info = load_tricount_info(candidate / INFO_FILE_NAME)
-    if info and info.get("tricount_key") == tricount_key:
-        return candidate
+        candidate = base_output_dir / f"{base_name}{suffix}"
+        if not candidate.exists() or directory_matches_tricount_key(candidate, tricount_key):
+            return candidate
 
-    return base_output_dir / f"{base_name}-{short_key}"
+        suffix_index += 1
 
 
 def write_tricount_info(
