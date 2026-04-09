@@ -114,6 +114,36 @@ def test_cli_honors_optional_output_flags(
     assert (export_dir / "response_data.json").is_file()
 
 
+def test_cli_dry_run_validates_and_prints_paths_without_writing_files(
+    monkeypatch, sample_api_response: dict, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_api = install_fake_api(monkeypatch, sample_api_response)
+    downloads = fake_download(monkeypatch)
+
+    exit_code = cli.main(
+        [
+            "--key",
+            "key-123456",
+            "--output-dir",
+            str(tmp_path),
+            "--write-excel",
+            "--write-sesterce",
+            "--save-response",
+            "--dry-run",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert fake_api.authenticated is True
+    assert fake_api.fetched_keys == ["key-123456"]
+    assert "Dry run: validated Tricount key and planned outputs." in captured.out
+    assert f"Export directory: {tmp_path / 'City-trip'}" in captured.out
+    assert f"CSV: {tmp_path / 'City-trip' / 'Transactions City-trip.csv'}" in captured.out
+    assert downloads == []
+    assert not (tmp_path / "City-trip").exists()
+
+
 def test_cli_can_disable_attachments(
     monkeypatch, sample_api_response: dict, tmp_path: Path
 ) -> None:

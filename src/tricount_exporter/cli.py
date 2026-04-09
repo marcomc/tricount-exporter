@@ -102,6 +102,23 @@ class AppConfig:
     write_sesterce: bool = False
     save_response: bool = False
     response_file_name: str = "response_data.json"
+    dry_run: bool = False
+
+
+@dataclass
+class ExportPlan:
+    tricount_key: str
+    tricount_title: str
+    source_url: str
+    export_dir: Path
+    csv_path: Path
+    excel_path: Path | None
+    sesterce_path: Path | None
+    attachments_dir: Path | None
+    response_path: Path | None
+    memberships: list[dict[str, str]]
+    transactions: list[dict[str, Any]]
+    raw_data: dict[str, Any]
 
 
 class TricountAPI:
@@ -368,6 +385,71 @@ def load_config(config_path: Path | None) -> AppConfig:
     )
 
 
+def build_export_plan(settings: AppConfig) -> ExportPlan:
+    if not settings.tricount_key:
+        raise ValueError("A Tricount key is required. Use --key or set tricount_key in config.")
+
+    api = TricountAPI()
+    api.authenticate()
+    data = api.fetch_tricount_data(settings.tricount_key)
+
+    handler = TricountHandler()
+    tricount_title = handler.get_tricount_title(data)
+    memberships, transactions = handler.parse_tricount_data(data)
+
+    export_dir = resolve_export_directory(
+        settings.output_dir, tricount_title, settings.tricount_key
+    )
+    safe_title = sanitize_path_component(tricount_title)
+    source_url = f"https://tricount.com/{settings.tricount_key}"
+
+    return ExportPlan(
+        tricount_key=settings.tricount_key,
+        tricount_title=tricount_title,
+        source_url=source_url,
+        export_dir=export_dir,
+        csv_path=export_dir / f"Transactions {safe_title}.csv",
+        excel_path=(
+            export_dir / f"Transactions {safe_title}.xlsx" if settings.write_excel else None
+        ),
+        sesterce_path=(
+            export_dir / f"Transactions {safe_title} (Sesterce).csv"
+            if settings.write_sesterce
+            else None
+        ),
+        attachments_dir=(
+            export_dir / f"Attachments {safe_title}" if settings.download_attachments else None
+        ),
+        response_path=(
+            export_dir / settings.response_file_name if settings.save_response else None
+        ),
+        memberships=memberships,
+        transactions=transactions,
+        raw_data=data,
+    )
+
+
+def print_export_plan(plan: ExportPlan) -> None:
+    attachment_count = sum(len(transaction["Attachments"]) for transaction in plan.transactions)
+    print("Dry run: validated Tricount key and planned outputs.")
+    print(f"Title: {plan.tricount_title}")
+    print(f"Key: {plan.tricount_key}")
+    print(f"Source URL: {plan.source_url}")
+    print(f"Transactions: {len(plan.transactions)}")
+    print(f"Members: {len(plan.memberships)}")
+    print(f"Attachments discovered: {attachment_count}")
+    print(f"Export directory: {plan.export_dir}")
+    print(f"CSV: {plan.csv_path}")
+    if plan.excel_path is not None:
+        print(f"Excel: {plan.excel_path}")
+    if plan.sesterce_path is not None:
+        print(f"Sesterce CSV: {plan.sesterce_path}")
+    if plan.attachments_dir is not None:
+        print(f"Attachments directory: {plan.attachments_dir}")
+    if plan.response_path is not None:
+        print(f"Raw response JSON: {plan.response_path}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -418,6 +500,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Save the raw JSON API response into the title-based output directory.",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate the key and show planned output paths without writing files.",
+    )
     return parser
 
 
@@ -437,50 +524,40 @@ def resolve_settings(args: argparse.Namespace) -> AppConfig:
         ),
         save_response=config.save_response if args.save_response is None else args.save_response,
         response_file_name=config.response_file_name,
+        dry_run=args.dry_run,
     )
 
 
 def export_tricount(settings: AppConfig) -> Path:
-    if not settings.tricount_key:
-        raise ValueError("A Tricount key is required. Use --key or set tricount_key in config.")
+    plan = build_export_plan(settings)
 
-    api = TricountAPI()
-    api.authenticate()
-    data = api.fetch_tricount_data(settings.tricount_key)
+    if settings.dry_run:
+        print_export_plan(plan)
+        return plan.export_dir
 
     handler = TricountHandler()
-    tricount_title = handler.get_tricount_title(data)
-    memberships, transactions = handler.parse_tricount_data(data)
+    plan.export_dir.mkdir(parents=True, exist_ok=True)
+    write_tricount_info(plan.export_dir, plan.tricount_title, plan.tricount_key, plan.source_url)
+    handler.write_to_csv(plan.transactions, file_path=plan.csv_path)
 
-    export_dir = resolve_export_directory(
-        settings.output_dir, tricount_title, settings.tricount_key
-    )
-    export_dir.mkdir(parents=True, exist_ok=True)
-    source_url = f"https://tricount.com/{settings.tricount_key}"
-    write_tricount_info(export_dir, tricount_title, settings.tricount_key, source_url)
+    if plan.excel_path is not None:
+        handler.write_to_excel(plan.transactions, file_path=plan.excel_path)
 
-    safe_title = sanitize_path_component(tricount_title)
-    csv_path = export_dir / f"Transactions {safe_title}.csv"
-    handler.write_to_csv(transactions, file_path=csv_path)
+    if plan.sesterce_path is not None:
+        handler.write_to_sesterce_csv(
+            plan.memberships,
+            plan.transactions,
+            file_path=plan.sesterce_path,
+        )
 
-    if settings.write_excel:
-        excel_path = export_dir / f"Transactions {safe_title}.xlsx"
-        handler.write_to_excel(transactions, file_path=excel_path)
+    if plan.attachments_dir is not None:
+        handler.download_attachments(plan.transactions, download_folder=plan.attachments_dir)
 
-    if settings.write_sesterce:
-        sesterce_path = export_dir / f"Transactions {safe_title} (Sesterce).csv"
-        handler.write_to_sesterce_csv(memberships, transactions, file_path=sesterce_path)
+    if plan.response_path is not None:
+        plan.response_path.write_text(json.dumps(plan.raw_data, indent=2), encoding="utf-8")
+        print(f"Raw response saved to {plan.response_path}")
 
-    if settings.download_attachments:
-        attachments_dir = export_dir / f"Attachments {safe_title}"
-        handler.download_attachments(transactions, download_folder=attachments_dir)
-
-    if settings.save_response:
-        response_path = export_dir / settings.response_file_name
-        response_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        print(f"Raw response saved to {response_path}")
-
-    return export_dir
+    return plan.export_dir
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -501,6 +578,10 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as error:  # noqa: BLE001
         print(f"Error: {error}", file=sys.stderr)
         return 1
+
+    if settings.dry_run:
+        print(f"Dry run completed for {output_dir}")
+        return 0
 
     print(f"Export completed in {output_dir}")
     return 0

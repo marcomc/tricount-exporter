@@ -12,6 +12,7 @@
 - [Sesterce CSV](#sesterce-csv)
 - [Output Layout](#output-layout)
 - [Attribution](#attribution)
+- [Developer Docs](#developer-docs)
 - [Development](#development)
 - [Disclaimer](#disclaimer)
 
@@ -168,6 +169,12 @@ Disable attachments for a run:
 tricount-exporter --key YOUR_PUBLIC_KEY --no-download-attachments
 ```
 
+Validate a key and preview the export paths without writing files:
+
+```bash
+tricount-exporter --key YOUR_PUBLIC_KEY --dry-run
+```
+
 Use a specific config file:
 
 ```bash
@@ -261,6 +268,13 @@ by `MrNachoX`.
 The current code, CLI shape, packaging, install flow, tests, and maintenance
 direction are specific to `tricount-exporter`.
 
+## Developer Docs
+
+Additional maintainer-facing documentation lives in [docs/README.md](docs/README.md).
+
+Current API findings are documented in
+[docs/api-research.md](docs/api-research.md).
+
 ## Development
 
 Install the dev environment:
@@ -295,6 +309,7 @@ Useful project files:
 - [AGENTS.md](AGENTS.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [TODO.md](TODO.md)
+- [docs/README.md](docs/README.md)
 - [pyproject.toml](pyproject.toml)
 
 ## Disclaimer

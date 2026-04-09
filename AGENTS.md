@@ -39,6 +39,7 @@ Supported inputs today:
 - `--key`
 - `--config`
 - `--output-dir`
+- `--dry-run`
 - `--download-attachments` or `--no-download-attachments`
 - `--write-excel` or `--no-write-excel`
 - `--write-sesterce` or `--no-write-sesterce`
@@ -50,6 +51,8 @@ Important runtime behavior:
 - Running `tricount-exporter` with no arguments prints help and exits with code
   `0`.
 - A missing key is an error unless `tricount_key` is set in config.
+- `--dry-run` still authenticates and fetches the Tricount so the key is
+  validated, but it must not create output files or directories.
 - Config values are loaded first and CLI flags override them.
 - `output_dir` in config supports `~` expansion.
 - Exports are isolated per Tricount title, not per key.
@@ -249,8 +252,6 @@ The roadmap is tracked in
 The most important pending areas are:
 
 - strengthen Python quality automation further
-- add a dry-run mode
-- explore whether the Tricount API exposes account-wide discovery
 - support repeated `--key` and repeated `--url`
 
 ## Practical Guidance For Future Agents
@@ -259,6 +260,7 @@ Before implementing changes:
 
 - read this file
 - read `README.md`
+- read `docs/api-research.md`
 - read `TODO.md`
 - inspect `src/tricount_exporter/cli.py`
 - inspect `src/tricount_exporter/__main__.py`
