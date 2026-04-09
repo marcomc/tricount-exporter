@@ -11,6 +11,8 @@
 - [Usage Examples](#usage-examples)
 - [Sesterce CSV](#sesterce-csv)
 - [Output Layout](#output-layout)
+- [Attribution](#attribution)
+- [Developer Docs](#developer-docs)
 - [Development](#development)
 - [Disclaimer](#disclaimer)
 
@@ -22,12 +24,14 @@ attachments, write Excel output, save the raw API response, and generate a
 Sesterce-compatible CSV.
 
 The key change in this version is that the Tricount key is no longer embedded
-in the script. Pass it with `--key`, or set a default in a config file.
+in the script. Pass one or more keys with repeated `--key` options, pass one or
+more shared links with repeated `--url` options, or set defaults in a config
+file.
 
 This repository started from a fork of
-[`MrNachoX/tricount-downloader`](https://github.com/MrNachoX/tricount-downloader).
-`tricount-exporter` is a standalone rewrite with its own tooling, defaults, and
-maintenance direction.
+[`MrNachoX/tricount-downloader`](https://github.com/MrNachoX/tricount-downloader)
+by `MrNachoX`. `tricount-exporter` is a standalone rewrite with its own
+tooling, defaults, and maintenance direction.
 
 > **Disclaimer:** tricount-exporter is an independent, community-developed
 > project and is **not** affiliated with, endorsed by, or in any way
@@ -39,12 +43,14 @@ maintenance direction.
 
 ## Features
 
-- Accepts the Tricount key from the command line or config file.
+- Accepts one or more Tricount keys or shared links from the command line or
+  config file.
 - Creates a dedicated output directory for each Tricount title.
 - Exports transactions to CSV by default.
 - Optionally exports Excel and Sesterce-compatible CSV files.
 - Optionally downloads attachments into the title-based export folder.
 - Can save the raw JSON API response for inspection.
+- Can filter exported transactions by date range.
 - Installs as a reusable local CLI under `~/.local/bin/tricount-exporter`.
 
 ## Requirements
@@ -58,6 +64,7 @@ For end users:
 For contributors:
 
 - `markdownlint` for Markdown validation
+- `mypy` through the project virtual environment
 - `shellcheck` for shell script validation
 
 ## Install
@@ -116,7 +123,10 @@ Start from the example file in this repository:
 Example:
 
 ```toml
-tricount_key = ""
+tricount_keys = []
+tricount_urls = []
+start_date = "2026-04-01"
+end_date = "2026-04-30"
 output_dir = "~/Downloads"
 download_attachments = true
 write_excel = false
@@ -144,10 +154,29 @@ Use a key directly:
 tricount-exporter --key YOUR_PUBLIC_KEY
 ```
 
-Or use the compatibility entry point:
+Export multiple Tricounts in one run:
 
 ```bash
-python main.py --key YOUR_PUBLIC_KEY
+tricount-exporter \
+  --key FIRST_PUBLIC_KEY \
+  --key SECOND_PUBLIC_KEY \
+  --url "https://tricount.com/THIRD_PUBLIC_KEY" \
+  --url "https://www.tricount.com/FOURTH_PUBLIC_KEY"
+```
+
+Filter exported transactions by date:
+
+```bash
+tricount-exporter \
+  --key YOUR_PUBLIC_KEY \
+  --start-date 2026-04-01 \
+  --end-date 2026-04-30
+```
+
+Or run the package module directly from a checkout:
+
+```bash
+python -m tricount_exporter --key YOUR_PUBLIC_KEY
 ```
 
 Enable extra outputs as needed:
@@ -164,6 +193,12 @@ Disable attachments for a run:
 
 ```bash
 tricount-exporter --key YOUR_PUBLIC_KEY --no-download-attachments
+```
+
+Validate a key and preview the export paths without writing files:
+
+```bash
+tricount-exporter --key YOUR_PUBLIC_KEY --dry-run
 ```
 
 Use a specific config file:
@@ -208,6 +243,17 @@ Write exports to a custom directory instead of `~/Downloads`:
 tricount-exporter --key YOUR_PUBLIC_KEY --output-dir ./exports
 ```
 
+Export multiple Tricounts from repeated inputs and let the exporter create
+separate title-based folders for each one:
+
+```bash
+tricount-exporter \
+  --key KEY_ONE \
+  --key KEY_TWO \
+  --url "https://tricount.com/KEY_THREE" \
+  --url "https://tricount.com/KEY_FOUR"
+```
+
 ## Sesterce CSV
 
 A Sesterce-compatible CSV is an export shaped for import into Sesterce, which
@@ -247,8 +293,24 @@ default, based on the Tricount title:
 ```
 
 `tricount-info.json` keeps the public key and download timestamp as a stable
-reference. If two different Tricounts share the same title, the second folder
-gets a short key suffix so both remain isolated.
+reference. If two different Tricounts share the same title, the exporter adds a
+short key suffix and keeps incrementing if needed until it finds a free folder.
+
+## Attribution
+
+This repository is an independent rewrite inspired by the upstream project
+[`MrNachoX/tricount-downloader`](https://github.com/MrNachoX/tricount-downloader)
+by `MrNachoX`.
+
+The current code, CLI shape, packaging, install flow, tests, and maintenance
+direction are specific to `tricount-exporter`.
+
+## Developer Docs
+
+Additional maintainer-facing documentation lives in [docs/README.md](docs/README.md).
+
+Current API findings are documented in
+[docs/api-research.md](docs/api-research.md).
 
 ## Development
 
@@ -261,7 +323,13 @@ make install-dev
 `make install-dev` is for working on the repository itself. It uses the local
 `.venv` and does not define the user-facing installed command.
 
-Run checks:
+Run the full maintainer quality gate:
+
+```bash
+make check
+```
+
+Run linting and static checks only:
 
 ```bash
 make lint
@@ -278,6 +346,7 @@ Useful project files:
 - [AGENTS.md](AGENTS.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [TODO.md](TODO.md)
+- [docs/README.md](docs/README.md)
 - [pyproject.toml](pyproject.toml)
 
 ## Disclaimer

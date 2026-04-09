@@ -7,12 +7,13 @@
 
 The current scope is:
 
-- accept a public Tricount shared key
+- accept one or more public Tricount shared keys or shared URLs
 - authenticate against the Tricount API
-- fetch one shared Tricount registry
+- fetch one or more shared Tricount registries
 - export transactions into human-readable files
 - optionally download attachments
 - optionally emit alternate export formats
+- optionally filter exported transactions by date window
 
 This project is no longer aiming for upstream drop-in compatibility. Prefer the
 smallest maintained surface that serves the rewritten CLI.
@@ -22,7 +23,7 @@ smallest maintained surface that serves the rewritten CLI.
 - Project name: `tricount-exporter`
 - Python package: `tricount_exporter`
 - Installed CLI: `tricount-exporter`
-- Compatibility entry point still present: `python main.py`
+- Module entry point: `python -m tricount_exporter`
 - Default user config path: `~/.config/tricount-exporter/config.toml`
 - Default runtime install path: `~/.local/share/tricount-exporter/venv`
 - Default output base directory: `~/Downloads`
@@ -32,13 +33,17 @@ affiliation with Tricount, bunq, or the upstream maintainer.
 
 ## Current Behavior
 
-The CLI currently supports one Tricount key per run.
+The CLI currently supports multiple Tricount inputs per run.
 
 Supported inputs today:
 
-- `--key`
+- repeated `--key`
+- repeated `--url`
 - `--config`
 - `--output-dir`
+- `--start-date`
+- `--end-date`
+- `--dry-run`
 - `--download-attachments` or `--no-download-attachments`
 - `--write-excel` or `--no-write-excel`
 - `--write-sesterce` or `--no-write-sesterce`
@@ -49,11 +54,15 @@ Important runtime behavior:
 
 - Running `tricount-exporter` with no arguments prints help and exits with code
   `0`.
-- A missing key is an error unless `tricount_key` is set in config.
+- A missing key or URL is an error unless `tricount_keys`/`tricount_urls` are
+  set in config.
+- `--dry-run` still authenticates and fetches the Tricount so the key is
+  validated, but it must not create output files or directories.
 - Config values are loaded first and CLI flags override them.
 - `output_dir` in config supports `~` expansion.
-- Exports are isolated per Tricount title, not per key.
+- Exports are isolated per Tricount title, not per key or URL.
 - The public key is still stored for traceability in `tricount-info.json`.
+- Date filtering is applied locally after the registry payload is fetched.
 
 ## Output Layout
 
@@ -86,6 +95,8 @@ Rules:
   - source URL
 - If two different Tricounts resolve to the same sanitized title, the second
   export directory gets a short key suffix, for example `City-trip-987654`.
+- If that suffix is already taken by a different Tricount, increment with
+  `-2`, `-3`, and so on until a free or matching directory is found.
 - If the existing title directory already belongs to the same key, it is reused.
 
 ## API Notes
@@ -109,6 +120,17 @@ Current API flow:
    `https://api.tricount.bunq.com/v1/user/<user_id>/registry?public_identifier_token=<key>`
    using the auth token header.
 7. Read the Tricount registry payload from `Response[0]["Registry"]`.
+
+Known mobile-capture findings:
+
+- enabling SSL proxying for `api.tricount.bunq.com` caused the app to fail its
+  trust checks
+- disabling SSL proxying for the API host allowed the app to log in and reach
+  the live API
+- the app continues to send Tricount-specific analytics and Sentry telemetry
+  while logged in
+- the API tunnel is visible in Proxyman, but the payload remains opaque unless
+  the host is decrypted
 
 Headers currently used by the client:
 
@@ -181,12 +203,12 @@ If changing packaging, preserve the standalone runtime behavior of
 
 Minimum checks expected after code or doc changes:
 
-- `make lint`
-- `make test`
+- `make check`
 
 Current quality tooling:
 
 - Ruff for Python linting and formatting checks
+- MyPy for Python static typing
 - `pytest` for regression tests
 - `markdownlint` for Markdown
 - `shellcheck --enable=all` for shell scripts
@@ -215,6 +237,8 @@ The tests currently cover:
 - optional raw-response save
 - disabling attachments
 - reading defaults from config
+- `~` expansion for config-based output directories
+- CLI override precedence over config values
 - export directory reuse for the same title and key
 - collision suffixing for different keys with the same title
 
@@ -244,11 +268,8 @@ The roadmap is tracked in
 
 The most important pending areas are:
 
-- remove remaining compatibility surface inherited from the upstream fork
 - strengthen Python quality automation further
-- add a dry-run mode
-- explore whether the Tricount API exposes account-wide discovery
-- support repeated `--key` and repeated `--url`
+- continue authenticated account discovery research
 
 ## Practical Guidance For Future Agents
 
@@ -256,8 +277,10 @@ Before implementing changes:
 
 - read this file
 - read `README.md`
+- read `docs/api-research.md`
 - read `TODO.md`
 - inspect `src/tricount_exporter/cli.py`
+- inspect `src/tricount_exporter/__main__.py`
 - inspect `tests/test_cli.py`
 
 When updating behavior:

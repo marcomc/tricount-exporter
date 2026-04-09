@@ -6,11 +6,37 @@
   "properties": {
     "tricount_key": {
       "type": "string",
-      "description": "Optional default public Tricount key."
+      "description": "Legacy optional default public Tricount key."
+    },
+    "tricount_url": {
+      "type": "string",
+      "description": "Legacy optional default public Tricount share URL."
+    },
+    "tricount_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional default public Tricount keys."
+    },
+    "tricount_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional default public Tricount share URLs."
     },
     "output_dir": {
       "type": "string",
       "description": "Base output directory for per-key exports."
+    },
+    "start_date": {
+      "type": "string",
+      "description": "Optional lower bound for exported transaction dates in YYYY-MM-DD format."
+    },
+    "end_date": {
+      "type": "string",
+      "description": "Optional upper bound for exported transaction dates in YYYY-MM-DD format."
     },
     "download_attachments": {
       "type": "boolean"

@@ -12,9 +12,10 @@ furnished to do so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-This repository, `tricount-exporter`, is a rewrite that originated from ideas and
-prior structure in the upstream project `MrNachoX/tricount-downloader`, which
-did not include a license file at the time this license was added here.
+This repository, `tricount-exporter`, is an independent rewrite that originated
+from ideas and prior structure in the upstream project
+`MrNachoX/tricount-downloader` by `MrNachoX`, which did not include a license
+file at the time this license was added here.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
