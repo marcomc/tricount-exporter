@@ -1,4 +1,5 @@
 # TODO
+
 1. Add a dry-run mode that validates the key and shows planned output paths without downloading files.
 2. Explore the full Tricount API surface to determine whether a user-scoped identifier can list all Tricounts visible to that user.
 3. Investigate how Tricount identifies a user for account-wide discovery and whether the API exposes IDs, memberships, or registries that can be enumerated safely.
