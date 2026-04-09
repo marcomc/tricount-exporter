@@ -5,6 +5,7 @@ import csv
 import json
 import os
 import re
+import shutil
 import sys
 import tomllib
 import uuid
@@ -160,6 +161,15 @@ def write_tricount_info(
     info_path.write_text(json.dumps(info, indent=2), encoding="utf-8")
 
 
+def remove_path_if_exists(path: Path) -> None:
+    if not path.exists():
+        return
+    if path.is_dir():
+        shutil.rmtree(path)
+        return
+    path.unlink()
+
+
 @dataclass
 class AppConfig:
     tricount_keys: list[str] = field(default_factory=list)
@@ -300,6 +310,7 @@ class TricountHandler:
         file_counter = 1
         total_files = sum(len(transaction["Attachments"]) for transaction in transactions)
         print(f"Total attachments: {total_files}")
+        remove_path_if_exists(download_folder)
 
         if total_files == 0:
             return
@@ -714,6 +725,17 @@ def export_single_tricount(
     handler = TricountHandler()
     plan.export_dir.mkdir(parents=True, exist_ok=True)
     write_tricount_info(plan.export_dir, plan.tricount_title, plan.tricount_key, plan.source_url)
+    safe_title = sanitize_path_component(plan.tricount_title)
+
+    if plan.excel_path is None:
+        remove_path_if_exists(plan.export_dir / f"Transactions {safe_title}.xlsx")
+    if plan.sesterce_path is None:
+        remove_path_if_exists(plan.export_dir / f"Transactions {safe_title} (Sesterce).csv")
+    if plan.response_path is None:
+        remove_path_if_exists(plan.export_dir / settings.response_file_name)
+    if plan.attachments_dir is None:
+        remove_path_if_exists(plan.export_dir / f"Attachments {safe_title}")
+
     handler.write_to_csv(plan.transactions, file_path=plan.csv_path)
 
     if plan.excel_path is not None:

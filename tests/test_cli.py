@@ -166,6 +166,52 @@ def test_cli_can_disable_attachments(
     assert not (export_dir / "Attachments City-trip").exists()
 
 
+def test_cli_clears_stale_outputs_on_reuse(
+    monkeypatch, sample_api_response: dict, tmp_path: Path
+) -> None:
+    fake_api = install_fake_api(monkeypatch, sample_api_response)
+    downloads = fake_download(monkeypatch)
+
+    first_exit_code = cli.main(
+        [
+            "--key",
+            "key-123456",
+            "--output-dir",
+            str(tmp_path),
+            "--write-excel",
+            "--write-sesterce",
+            "--save-response",
+        ]
+    )
+    assert first_exit_code == 0
+
+    export_dir = tmp_path / "City-trip"
+    assert (export_dir / "Transactions City-trip.csv").is_file()
+    assert (export_dir / "Transactions City-trip.xlsx").is_file()
+    assert (export_dir / "Transactions City-trip (Sesterce).csv").is_file()
+    assert (export_dir / "response_data.json").is_file()
+    assert (export_dir / "Attachments City-trip" / "receipt_1.jpg").is_file()
+
+    second_exit_code = cli.main(
+        [
+            "--key",
+            "key-123456",
+            "--output-dir",
+            str(tmp_path),
+            "--no-download-attachments",
+        ]
+    )
+
+    assert second_exit_code == 0
+    assert fake_api.fetched_keys == ["key-123456", "key-123456"]
+    assert len(downloads) == 1
+    assert (export_dir / "Transactions City-trip.csv").is_file()
+    assert not (export_dir / "Transactions City-trip.xlsx").exists()
+    assert not (export_dir / "Transactions City-trip (Sesterce).csv").exists()
+    assert not (export_dir / "response_data.json").exists()
+    assert not (export_dir / "Attachments City-trip").exists()
+
+
 def test_cli_supports_multiple_keys_urls_and_shared_folders(
     monkeypatch, sample_api_response: dict, tmp_path: Path
 ) -> None:
