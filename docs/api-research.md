@@ -7,6 +7,7 @@
 - [Observed Session Payload](#observed-session-payload)
 - [Registry Endpoints](#registry-endpoints)
 - [Findings For Account-Wide Discovery](#findings-for-account-wide-discovery)
+- [Mobile Capture Follow-up](#mobile-capture-follow-up)
 - [Developer Notes](#developer-notes)
 
 ## Scope
@@ -162,6 +163,35 @@ What this means for TODO items 2 and 3:
 At this stage, there is no safe implementation path for "list all Tricounts for
 a user" without further research into authenticated account sessions beyond the
 public-link flow.
+
+## Mobile Capture Follow-up
+
+The later iPhone capture session added a few more concrete findings:
+
+- enabling SSL proxying for `api.tricount.bunq.com` caused the app to fail
+  with a server-trust error
+- disabling SSL proxying for that host allowed the app to log in and continue
+  running
+- Proxyman could then observe `CONNECT` tunnels to `api.tricount.bunq.com`,
+  `sentry.bunq.com`, and `snowplow-tricount.data.bunq.com`
+- the login/session telemetry exposed a UUID-shaped analytics `userId`
+  (`a42013ff-9000-4652-b3f6-ad57a5d3bc00`), but that value did not work as a
+  Tricount API `user_id`
+- a numeric candidate from the capture (`92124206`) also failed when used as
+  `/v1/user/<id>/registry`
+- a fresh anonymous API session created during direct probing returned a
+  separate numeric `UserPerson.id` (`79939318`), but that session still did not
+  enumerate any registries and should not be treated as proof of a recoverable
+  personal account identity
+
+This means the current research state is:
+
+- the app can log in and reach the live Tricount API
+- the app still does not expose a confirmed account-wide user identifier
+- the API payloads remain opaque while the app is protected by trust checks or
+  when SSL proxying is disabled for the real API host
+- more research is needed before any account-wide listing feature can be wired
+  into the CLI
 
 ## Developer Notes
 
