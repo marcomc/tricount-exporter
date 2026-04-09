@@ -2,9 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
-
 ## [0.1.0] - 2026-04-09 - initial standalone rewrite
+
+### Added
+
+- Added repeatable `--key` and `--url` inputs for multi-Tricount runs.
+- Added share-link token extraction, title-based batch exports, and local
+  date filtering for exported transactions.
+- Updated the config schema, examples, and developer notes to match the
+  current CLI behavior.
+
 
 ### Changed
 

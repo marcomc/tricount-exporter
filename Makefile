@@ -12,6 +12,7 @@ CONFIG_PATH ?= $(CONFIG_DIR)/config.toml
 APP_HOME ?= $(HOME)/.local/share/$(INSTALL_NAME)
 APP_VENV ?= $(APP_HOME)/venv
 APP_PIP ?= $(APP_VENV)/bin/pip
+SYSTEM_SITE_PACKAGES ?= $(shell python3 -c "import site; print(site.getsitepackages()[0])")
 
 .DEFAULT_GOAL := help
 
@@ -38,6 +39,7 @@ venv: ## Create the virtual environment
 	@if [[ ! -d "$(VENV)" ]]; then \
 		python3 -m venv "$(VENV)"; \
 	fi
+	$(VENV)/bin/python -m ensurepip --upgrade
 	$(PIP) install --upgrade pip
 
 app-venv: ## Create the standalone runtime virtual environment
@@ -45,14 +47,15 @@ app-venv: ## Create the standalone runtime virtual environment
 	@if [[ ! -d "$(APP_VENV)" ]]; then \
 		python3 -m venv "$(APP_VENV)"; \
 	fi
+	$(APP_VENV)/bin/python -m ensurepip --upgrade
 	$(APP_PIP) install --upgrade pip
 
 install: check-deps app-venv ## Install the CLI in a standalone user venv
-	$(APP_PIP) install .
+	PYTHONPATH="$(SYSTEM_SITE_PACKAGES):$${PYTHONPATH:-}" $(APP_PIP) install --no-build-isolation .
 	@$(MAKE) install-link install-config
 
 install-dev: check-deps venv ## Install repo-local dev dependencies
-	$(PIP) install -e ".[dev]"
+	PYTHONPATH="$(SYSTEM_SITE_PACKAGES):$${PYTHONPATH:-}" $(PIP) install --no-build-isolation -e ".[dev]"
 	@$(MAKE) install-config
 
 install-link: ## Link the standalone runtime CLI into ~/.local/bin
@@ -76,15 +79,15 @@ uninstall: ## Remove the linked CLI and standalone runtime environment
 	@rm -rf "$(APP_HOME)"
 	@echo "Removed $(INSTALL_PATH)"
 
-lint: install-dev ## Run Python and Markdown checks
-	$(PY) -m ruff check src tests
-	$(PY) -m ruff format --check src tests
-	$(PY) -m mypy src
+lint: venv ## Run Python and Markdown checks
+	PYTHONPATH=src $(PY) -m ruff check src tests
+	PYTHONPATH=src $(PY) -m ruff format --check src tests
+	PYTHONPATH=src $(PY) -m mypy src
 	markdownlint --config .markdownlint.json $(MARKDOWN_FILES)
 	shellcheck --enable=all scripts/*.sh
 
-test: install-dev ## Run regression tests
-	$(PY) -m pytest -q
+test: venv ## Run regression tests
+	PYTHONPATH=src $(PY) -m pytest -q
 
 check: lint test ## Run the full maintainer quality gate
 

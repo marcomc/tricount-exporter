@@ -24,7 +24,9 @@ attachments, write Excel output, save the raw API response, and generate a
 Sesterce-compatible CSV.
 
 The key change in this version is that the Tricount key is no longer embedded
-in the script. Pass it with `--key`, or set a default in a config file.
+in the script. Pass one or more keys with repeated `--key` options, pass one or
+more shared links with repeated `--url` options, or set defaults in a config
+file.
 
 This repository started from a fork of
 [`MrNachoX/tricount-downloader`](https://github.com/MrNachoX/tricount-downloader)
@@ -41,12 +43,14 @@ tooling, defaults, and maintenance direction.
 
 ## Features
 
-- Accepts the Tricount key from the command line or config file.
+- Accepts one or more Tricount keys or shared links from the command line or
+  config file.
 - Creates a dedicated output directory for each Tricount title.
 - Exports transactions to CSV by default.
 - Optionally exports Excel and Sesterce-compatible CSV files.
 - Optionally downloads attachments into the title-based export folder.
 - Can save the raw JSON API response for inspection.
+- Can filter exported transactions by date range.
 - Installs as a reusable local CLI under `~/.local/bin/tricount-exporter`.
 
 ## Requirements
@@ -119,7 +123,10 @@ Start from the example file in this repository:
 Example:
 
 ```toml
-tricount_key = ""
+tricount_keys = []
+tricount_urls = []
+start_date = "2026-04-01"
+end_date = "2026-04-30"
 output_dir = "~/Downloads"
 download_attachments = true
 write_excel = false
@@ -145,6 +152,25 @@ Use a key directly:
 
 ```bash
 tricount-exporter --key YOUR_PUBLIC_KEY
+```
+
+Export multiple Tricounts in one run:
+
+```bash
+tricount-exporter \
+  --key FIRST_PUBLIC_KEY \
+  --key SECOND_PUBLIC_KEY \
+  --url "https://tricount.com/THIRD_PUBLIC_KEY" \
+  --url "https://www.tricount.com/FOURTH_PUBLIC_KEY"
+```
+
+Filter exported transactions by date:
+
+```bash
+tricount-exporter \
+  --key YOUR_PUBLIC_KEY \
+  --start-date 2026-04-01 \
+  --end-date 2026-04-30
 ```
 
 Or run the package module directly from a checkout:
@@ -215,6 +241,17 @@ Write exports to a custom directory instead of `~/Downloads`:
 
 ```bash
 tricount-exporter --key YOUR_PUBLIC_KEY --output-dir ./exports
+```
+
+Export multiple Tricounts from repeated inputs and let the exporter create
+separate title-based folders for each one:
+
+```bash
+tricount-exporter \
+  --key KEY_ONE \
+  --key KEY_TWO \
+  --url "https://tricount.com/KEY_THREE" \
+  --url "https://tricount.com/KEY_FOUR"
 ```
 
 ## Sesterce CSV

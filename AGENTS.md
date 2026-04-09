@@ -7,12 +7,13 @@
 
 The current scope is:
 
-- accept a public Tricount shared key
+- accept one or more public Tricount shared keys or shared URLs
 - authenticate against the Tricount API
-- fetch one shared Tricount registry
+- fetch one or more shared Tricount registries
 - export transactions into human-readable files
 - optionally download attachments
 - optionally emit alternate export formats
+- optionally filter exported transactions by date window
 
 This project is no longer aiming for upstream drop-in compatibility. Prefer the
 smallest maintained surface that serves the rewritten CLI.
@@ -32,13 +33,16 @@ affiliation with Tricount, bunq, or the upstream maintainer.
 
 ## Current Behavior
 
-The CLI currently supports one Tricount key per run.
+The CLI currently supports multiple Tricount inputs per run.
 
 Supported inputs today:
 
-- `--key`
+- repeated `--key`
+- repeated `--url`
 - `--config`
 - `--output-dir`
+- `--start-date`
+- `--end-date`
 - `--dry-run`
 - `--download-attachments` or `--no-download-attachments`
 - `--write-excel` or `--no-write-excel`
@@ -50,13 +54,15 @@ Important runtime behavior:
 
 - Running `tricount-exporter` with no arguments prints help and exits with code
   `0`.
-- A missing key is an error unless `tricount_key` is set in config.
+- A missing key or URL is an error unless `tricount_keys`/`tricount_urls` are
+  set in config.
 - `--dry-run` still authenticates and fetches the Tricount so the key is
   validated, but it must not create output files or directories.
 - Config values are loaded first and CLI flags override them.
 - `output_dir` in config supports `~` expansion.
-- Exports are isolated per Tricount title, not per key.
+- Exports are isolated per Tricount title, not per key or URL.
 - The public key is still stored for traceability in `tricount-info.json`.
+- Date filtering is applied locally after the registry payload is fetched.
 
 ## Output Layout
 
@@ -114,6 +120,17 @@ Current API flow:
    `https://api.tricount.bunq.com/v1/user/<user_id>/registry?public_identifier_token=<key>`
    using the auth token header.
 7. Read the Tricount registry payload from `Response[0]["Registry"]`.
+
+Known mobile-capture findings:
+
+- enabling SSL proxying for `api.tricount.bunq.com` caused the app to fail its
+  trust checks
+- disabling SSL proxying for the API host allowed the app to log in and reach
+  the live API
+- the app continues to send Tricount-specific analytics and Sentry telemetry
+  while logged in
+- the API tunnel is visible in Proxyman, but the payload remains opaque unless
+  the host is decrypted
 
 Headers currently used by the client:
 
@@ -252,7 +269,7 @@ The roadmap is tracked in
 The most important pending areas are:
 
 - strengthen Python quality automation further
-- support repeated `--key` and repeated `--url`
+- continue authenticated account discovery research
 
 ## Practical Guidance For Future Agents
 

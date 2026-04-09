@@ -8,10 +8,11 @@ import re
 import sys
 import tomllib
 import uuid
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import parse_qs, unquote, urlparse
 
 import openpyxl
 import requests
@@ -45,6 +46,72 @@ def parse_bool(value: Any, default: bool) -> bool:
 
 def current_timestamp() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def parse_optional_date(value: Any) -> date | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError as error:
+            raise ValueError(f"Invalid date value: {value!r}. Expected YYYY-MM-DD.") from error
+    raise ValueError(f"Invalid date value: {value!r}. Expected YYYY-MM-DD.")
+
+
+def parse_cli_date(value: str) -> date:
+    parsed = parse_optional_date(value)
+    if parsed is None:
+        raise argparse.ArgumentTypeError("Date must not be empty.")
+    return parsed
+
+
+def coerce_string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        stripped = value.strip()
+        return [stripped] if stripped else []
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            if not isinstance(item, str):
+                raise ValueError(f"Invalid list item: {item!r}")
+            stripped = item.strip()
+            if stripped:
+                result.append(stripped)
+        return result
+    raise ValueError(f"Invalid list value: {value!r}")
+
+
+def extract_public_identifier_token_from_url(url: str) -> str:
+    parsed = urlparse(url.strip())
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError(f"Invalid Tricount URL: {url!r}")
+
+    host = parsed.netloc.split("@")[-1].split(":")[0].lower()
+    if not host.endswith("tricount.com"):
+        raise ValueError(f"Expected a tricount.com URL, got {url!r}")
+
+    query = parse_qs(parsed.query)
+    for query_key in ("public_identifier_token", "token", "key"):
+        values = query.get(query_key)
+        if values:
+            token = values[0].strip()
+            if token:
+                return token
+
+    path_segments = [
+        unquote(segment).strip() for segment in parsed.path.split("/") if segment.strip()
+    ]
+    if not path_segments:
+        raise ValueError(f"Could not extract a Tricount token from URL: {url!r}")
+
+    return path_segments[-1]
 
 
 def load_tricount_info(path: Path) -> dict[str, Any] | None:
@@ -95,14 +162,27 @@ def write_tricount_info(
 
 @dataclass
 class AppConfig:
-    tricount_key: str | None = None
+    tricount_keys: list[str] = field(default_factory=list)
+    tricount_urls: list[str] = field(default_factory=list)
     output_dir: Path = Path.home() / "Downloads"
+    start_date: date | None = None
+    end_date: date | None = None
     download_attachments: bool = True
     write_excel: bool = False
     write_sesterce: bool = False
     save_response: bool = False
     response_file_name: str = "response_data.json"
     dry_run: bool = False
+
+    @property
+    def tricount_key(self) -> str | None:
+        return self.tricount_keys[0] if self.tricount_keys else None
+
+
+@dataclass(frozen=True)
+class TricountInput:
+    public_identifier_token: str
+    source_url: str
 
 
 @dataclass
@@ -119,6 +199,12 @@ class ExportPlan:
     memberships: list[dict[str, str]]
     transactions: list[dict[str, Any]]
     raw_data: dict[str, Any]
+
+
+@dataclass
+class ExportBatchResult:
+    export_dirs: list[Path] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class TricountAPI:
@@ -211,13 +297,14 @@ class TricountHandler:
 
     @staticmethod
     def download_attachments(transactions: list[dict[str, Any]], download_folder: Path) -> None:
-        download_folder.mkdir(parents=True, exist_ok=True)
         file_counter = 1
         total_files = sum(len(transaction["Attachments"]) for transaction in transactions)
         print(f"Total attachments: {total_files}")
 
         if total_files == 0:
             return
+
+        download_folder.mkdir(parents=True, exist_ok=True)
 
         with tqdm(total=total_files, desc="Downloading attachments") as progress_bar:
             for transaction in transactions:
@@ -261,6 +348,29 @@ class TricountHandler:
             attachment_urls,
             transaction["Category"],
         ]
+
+    @staticmethod
+    def transaction_date(transaction: dict[str, Any]) -> date:
+        return datetime.strptime(transaction["When"], "%Y-%m-%d %H:%M:%S.%f").date()
+
+    @staticmethod
+    def filter_transactions_by_date(
+        transactions: list[dict[str, Any]],
+        start_date: date | None,
+        end_date: date | None,
+    ) -> list[dict[str, Any]]:
+        if start_date is None and end_date is None:
+            return transactions
+
+        filtered_transactions: list[dict[str, Any]] = []
+        for transaction in transactions:
+            transaction_date = TricountHandler.transaction_date(transaction)
+            if start_date is not None and transaction_date < start_date:
+                continue
+            if end_date is not None and transaction_date > end_date:
+                continue
+            filtered_transactions.append(transaction)
+        return filtered_transactions
 
     @staticmethod
     def prepare_sesterce_transaction_data(
@@ -372,9 +482,22 @@ def load_config(config_path: Path | None) -> AppConfig:
     with path.open("rb") as handle:
         raw_config = tomllib.load(handle)
 
+    tricount_keys = coerce_string_list(raw_config.get("tricount_keys"))
+    tricount_key = raw_config.get("tricount_key")
+    if isinstance(tricount_key, str) and tricount_key.strip():
+        tricount_keys.append(tricount_key.strip())
+
+    tricount_urls = coerce_string_list(raw_config.get("tricount_urls"))
+    tricount_url = raw_config.get("tricount_url")
+    if isinstance(tricount_url, str) and tricount_url.strip():
+        tricount_urls.append(tricount_url.strip())
+
     return AppConfig(
-        tricount_key=raw_config.get("tricount_key"),
+        tricount_keys=tricount_keys,
+        tricount_urls=tricount_urls,
         output_dir=Path(raw_config.get("output_dir", "~/Downloads")).expanduser(),
+        start_date=parse_optional_date(raw_config.get("start_date")),
+        end_date=parse_optional_date(raw_config.get("end_date")),
         download_attachments=parse_bool(
             raw_config.get("download_attachments"), AppConfig.download_attachments
         ),
@@ -385,26 +508,54 @@ def load_config(config_path: Path | None) -> AppConfig:
     )
 
 
-def build_export_plan(settings: AppConfig) -> ExportPlan:
-    if not settings.tricount_key:
-        raise ValueError("A Tricount key is required. Use --key or set tricount_key in config.")
+def resolve_tricount_inputs(settings: AppConfig) -> list[TricountInput]:
+    sources: list[TricountInput] = []
+    for tricount_key in settings.tricount_keys:
+        sources.append(
+            TricountInput(
+                public_identifier_token=tricount_key,
+                source_url=f"https://tricount.com/{tricount_key}",
+            )
+        )
+    for tricount_url in settings.tricount_urls:
+        sources.append(
+            TricountInput(
+                public_identifier_token=extract_public_identifier_token_from_url(tricount_url),
+                source_url=tricount_url,
+            )
+        )
 
-    api = TricountAPI()
-    api.authenticate()
-    data = api.fetch_tricount_data(settings.tricount_key)
+    if not sources:
+        raise ValueError(
+            "At least one Tricount key or URL is required. Use --key or --url,"
+            " or set tricount_keys/tricount_urls in config."
+        )
+
+    return sources
+
+
+def build_export_plan(
+    settings: AppConfig, api: TricountAPI, tricount_input: TricountInput
+) -> ExportPlan:
+    data = api.fetch_tricount_data(tricount_input.public_identifier_token)
 
     handler = TricountHandler()
     tricount_title = handler.get_tricount_title(data)
     memberships, transactions = handler.parse_tricount_data(data)
+    transactions = handler.filter_transactions_by_date(
+        transactions,
+        settings.start_date,
+        settings.end_date,
+    )
 
     export_dir = resolve_export_directory(
-        settings.output_dir, tricount_title, settings.tricount_key
+        settings.output_dir, tricount_title, tricount_input.public_identifier_token
     )
     safe_title = sanitize_path_component(tricount_title)
-    source_url = f"https://tricount.com/{settings.tricount_key}"
+    source_url = tricount_input.source_url
 
     return ExportPlan(
-        tricount_key=settings.tricount_key,
+        tricount_key=tricount_input.public_identifier_token,
         tricount_title=tricount_title,
         source_url=source_url,
         export_dir=export_dir,
@@ -453,8 +604,8 @@ def print_export_plan(plan: ExportPlan) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Download transactions from a public Tricount key and export them to"
-            " title-based output folders."
+            "Download transactions from public Tricount keys or share URLs and export"
+            " them to title-based output folders."
         )
     )
     parser.add_argument(
@@ -464,7 +615,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--key",
-        help="Public Tricount key. Overrides any value set in the config file.",
+        action="append",
+        default=[],
+        metavar="KEY",
+        help="Public Tricount key. Repeat to export multiple Tricounts.",
+    )
+    parser.add_argument(
+        "--url",
+        action="append",
+        default=[],
+        metavar="URL",
+        help="Public Tricount share URL. Repeat to export multiple Tricounts.",
     )
     parser.add_argument(
         "--config",
@@ -501,6 +662,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Save the raw JSON API response into the title-based output directory.",
     )
     parser.add_argument(
+        "--start-date",
+        type=parse_cli_date,
+        help="Only export transactions on or after YYYY-MM-DD.",
+    )
+    parser.add_argument(
+        "--end-date",
+        type=parse_cli_date,
+        help="Only export transactions on or before YYYY-MM-DD.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate the key and show planned output paths without writing files.",
@@ -511,8 +682,11 @@ def build_parser() -> argparse.ArgumentParser:
 def resolve_settings(args: argparse.Namespace) -> AppConfig:
     config = load_config(args.config)
     return AppConfig(
-        tricount_key=args.key or config.tricount_key,
+        tricount_keys=list(args.key) if args.key else config.tricount_keys,
+        tricount_urls=list(args.url) if args.url else config.tricount_urls,
         output_dir=args.output_dir or config.output_dir,
+        start_date=args.start_date if args.start_date is not None else config.start_date,
+        end_date=args.end_date if args.end_date is not None else config.end_date,
         download_attachments=(
             config.download_attachments
             if args.download_attachments is None
@@ -528,8 +702,10 @@ def resolve_settings(args: argparse.Namespace) -> AppConfig:
     )
 
 
-def export_tricount(settings: AppConfig) -> Path:
-    plan = build_export_plan(settings)
+def export_single_tricount(
+    settings: AppConfig, api: TricountAPI, tricount_input: TricountInput
+) -> Path:
+    plan = build_export_plan(settings, api, tricount_input)
 
     if settings.dry_run:
         print_export_plan(plan)
@@ -560,6 +736,25 @@ def export_tricount(settings: AppConfig) -> Path:
     return plan.export_dir
 
 
+def export_tricounts(settings: AppConfig) -> ExportBatchResult:
+    tricount_inputs = resolve_tricount_inputs(settings)
+
+    api = TricountAPI()
+    api.authenticate()
+
+    result = ExportBatchResult()
+    for tricount_input in tricount_inputs:
+        try:
+            output_dir = export_single_tricount(settings, api, tricount_input)
+        except Exception as error:  # noqa: BLE001
+            result.errors.append(f"{tricount_input.source_url}: {error}")
+            print(f"Error exporting {tricount_input.source_url}: {error}", file=sys.stderr)
+            continue
+        result.export_dirs.append(output_dir)
+
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     if argv is None:
@@ -571,7 +766,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         settings = resolve_settings(args)
-        output_dir = export_tricount(settings)
+        result = export_tricounts(settings)
     except requests.HTTPError as error:
         print(f"HTTP error: {error}", file=sys.stderr)
         return 1
@@ -579,9 +774,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
+    if result.errors:
+        return 1
+
     if settings.dry_run:
-        print(f"Dry run completed for {output_dir}")
+        if len(result.export_dirs) == 1:
+            print(f"Dry run completed for {result.export_dirs[0]}")
+        else:
+            print(f"Dry run completed for {len(result.export_dirs)} Tricounts.")
         return 0
 
-    print(f"Export completed in {output_dir}")
+    if len(result.export_dirs) == 1:
+        print(f"Export completed in {result.export_dirs[0]}")
+    else:
+        print(f"Export completed for {len(result.export_dirs)} Tricounts.")
     return 0

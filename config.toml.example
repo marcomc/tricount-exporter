@@ -1,7 +1,13 @@
 # Copy this file to ~/.config/tricount-exporter/config.toml or pass it with --config.
 
-# Optional default Tricount key. You can leave it empty and pass --key on each run.
-tricount_key = ""
+# Optional default Tricount keys and share URLs. You can leave them empty and
+# pass repeated --key / --url options on each run.
+tricount_keys = []
+tricount_urls = []
+
+# Optional date window for exported transactions.
+# start_date = "2026-04-01"
+# end_date = "2026-04-30"
 
 # Base directory where title-based export folders are created.
 output_dir = "~/Downloads"

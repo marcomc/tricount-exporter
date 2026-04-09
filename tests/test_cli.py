@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
@@ -165,6 +166,95 @@ def test_cli_can_disable_attachments(
     assert not (export_dir / "Attachments City-trip").exists()
 
 
+def test_cli_supports_multiple_keys_urls_and_shared_folders(
+    monkeypatch, sample_api_response: dict, tmp_path: Path
+) -> None:
+    fake_api = install_fake_api(monkeypatch, sample_api_response)
+    downloads = fake_download(monkeypatch)
+
+    exit_code = cli.main(
+        [
+            "--key",
+            "key-111111",
+            "--key",
+            "key-222222",
+            "--url",
+            "https://tricount.com/share?public_identifier_token=url-key-333333",
+            "--url",
+            "https://www.tricount.com/url-key-444444",
+            "--output-dir",
+            str(tmp_path),
+        ]
+    )
+
+    assert exit_code == 0
+    assert fake_api.fetched_keys == [
+        "key-111111",
+        "key-222222",
+        "url-key-333333",
+        "url-key-444444",
+    ]
+
+    export_dirs = [
+        tmp_path / "City-trip",
+        tmp_path / "City-trip-222222",
+        tmp_path / "City-trip-333333",
+        tmp_path / "City-trip-444444",
+    ]
+    for export_dir in export_dirs:
+        assert export_dir.is_dir()
+        assert (export_dir / "Transactions City-trip.csv").is_file()
+        assert (export_dir / "Attachments City-trip" / "receipt_1.jpg").is_file()
+
+    assert len(downloads) == 4
+
+
+def test_cli_filters_transactions_by_date_window(
+    monkeypatch,
+    sample_api_response_two_transactions: dict,
+    tmp_path: Path,
+) -> None:
+    install_fake_api(monkeypatch, sample_api_response_two_transactions)
+    downloads = fake_download(monkeypatch)
+
+    exit_code = cli.main(
+        [
+            "--key",
+            "key-123456",
+            "--output-dir",
+            str(tmp_path),
+            "--start-date",
+            "2026-04-10",
+            "--end-date",
+            "2026-04-30",
+        ]
+    )
+
+    assert exit_code == 0
+    export_dir = tmp_path / "City-trip"
+    csv_path = export_dir / "Transactions City-trip.csv"
+    assert csv_path.is_file()
+    assert not (export_dir / "Attachments City-trip").exists()
+    assert downloads == []
+
+    with csv_path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.reader(handle, delimiter=";"))
+
+    assert rows[0] == [
+        "Who Paid",
+        "Total",
+        "Currency",
+        "Description",
+        "When",
+        "Involved",
+        "File Names",
+        "Attachment URLs",
+        "Category",
+    ]
+    assert len(rows) == 2
+    assert rows[1][3] == "Museum"
+
+
 def test_cli_reads_key_from_config(
     monkeypatch, sample_api_response: dict, tmp_path: Path, config_path: Path
 ) -> None:
@@ -206,11 +296,36 @@ def test_load_config_expands_home_in_output_dir(
     assert loaded.output_dir == tmp_path / "Exports"
 
 
+def test_load_config_supports_multiple_inputs_and_dates(
+    config_path: Path,
+) -> None:
+    config_path.write_text(
+        "\n".join(
+            [
+                'tricount_keys = ["config-key-1", "config-key-2"]',
+                'tricount_urls = ["https://tricount.com/config-url-1"]',
+                'start_date = "2026-04-01"',
+                'end_date = "2026-04-30"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = cli.load_config(config_path)
+
+    assert loaded.tricount_keys == ["config-key-1", "config-key-2"]
+    assert loaded.tricount_urls == ["https://tricount.com/config-url-1"]
+    assert loaded.start_date is not None
+    assert loaded.start_date.isoformat() == "2026-04-01"
+    assert loaded.end_date is not None
+    assert loaded.end_date.isoformat() == "2026-04-30"
+
+
 def test_resolve_settings_prefers_cli_flags_over_config(config_path: Path, tmp_path: Path) -> None:
     config_path.write_text(
         "\n".join(
             [
-                'tricount_key = "config-key"',
+                'tricount_keys = ["config-key"]',
                 'output_dir = "/tmp/from-config"',
                 "download_attachments = true",
                 "write_excel = false",
@@ -238,6 +353,7 @@ def test_resolve_settings_prefers_cli_flags_over_config(config_path: Path, tmp_p
     settings = cli.resolve_settings(args)
 
     assert settings.tricount_key == "cli-key"
+    assert settings.tricount_keys == ["cli-key"]
     assert settings.output_dir == tmp_path
     assert settings.download_attachments is False
     assert settings.write_excel is True
