@@ -1,0 +1,16 @@
+# Copy this file to ~/.config/tricount-exporter/config.toml or pass it with --config.
+
+# Optional default Tricount key. You can leave it empty and pass --key on each run.
+tricount_key = ""
+
+# Base directory where title-based export folders are created.
+output_dir = "~/Downloads"
+
+# Feature flags.
+download_attachments = true
+write_excel = false
+write_sesterce = false
+save_response = false
+
+# File name used when save_response = true.
+response_file_name = "response_data.json"

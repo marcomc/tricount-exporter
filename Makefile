@@ -1,0 +1,82 @@
+SHELL := /bin/zsh
+VENV := .venv
+PY := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
+PACKAGE := tricount_exporter
+MARKDOWN_FILES := README.md CHANGELOG.md TODO.md AGENTS.md
+PREFIX ?= $(HOME)/.local
+BINDIR ?= $(PREFIX)/bin
+INSTALL_NAME ?= tricount-exporter
+INSTALL_PATH ?= $(BINDIR)/$(INSTALL_NAME)
+CONFIG_DIR ?= $(HOME)/.config/tricount-exporter
+CONFIG_PATH ?= $(CONFIG_DIR)/config.toml
+
+.DEFAULT_GOAL := help
+
+.PHONY: help check-deps venv install install-dev install-link install-config uninstall lint test run clean
+
+help: ## Show available targets
+	@awk 'BEGIN { FS = ":.*##" } /^[a-zA-Z_-]+:.*##/ { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+
+check-deps: ## Verify required system prerequisites
+	@command -v python3 >/dev/null 2>&1 \
+		|| { echo "python3 not found"; exit 1; }
+	@python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" \
+		|| { echo "Python 3.11+ required (found $$(python3 --version 2>&1))"; exit 1; }
+	@mkdir -p "$(BINDIR)" "$(CONFIG_DIR)"
+	@if print -r -- "$$PATH" | tr ':' '\n' | grep -Fx "$(BINDIR)" >/dev/null; then \
+		echo "$(BINDIR) is on PATH"; \
+	else \
+		echo "$(BINDIR) is not on PATH"; \
+		echo "Add this to your shell profile:"; \
+		echo "export PATH=\"$(BINDIR):\$$PATH\""; \
+	fi
+
+venv: ## Create the virtual environment
+	@if [[ ! -d "$(VENV)" ]]; then \
+		python3 -m venv "$(VENV)"; \
+	fi
+	$(PIP) install --upgrade pip
+
+install: check-deps venv ## Install the CLI and link it into ~/.local/bin
+	$(PIP) install -e .
+	@$(MAKE) install-link install-config
+
+install-dev: check-deps venv ## Install the CLI with dev dependencies
+	$(PIP) install -e ".[dev]"
+	@$(MAKE) install-link install-config
+
+install-link: ## Link the installed CLI into ~/.local/bin
+	@mkdir -p "$(BINDIR)"
+	@[[ -x "$(CURDIR)/$(VENV)/bin/$(INSTALL_NAME)" ]] \
+		|| { echo "$(CURDIR)/$(VENV)/bin/$(INSTALL_NAME) not found. Run 'make install' first."; exit 1; }
+	@ln -sf "$(CURDIR)/$(VENV)/bin/$(INSTALL_NAME)" "$(INSTALL_PATH)"
+	@echo "Installed $(INSTALL_NAME) -> $(INSTALL_PATH)"
+
+install-config: ## Install the example config if it does not exist yet
+	@mkdir -p "$(CONFIG_DIR)"
+	@if [[ ! -f "$(CONFIG_PATH)" ]]; then \
+		cp config.toml.example "$(CONFIG_PATH)"; \
+		echo "Installed config template to $(CONFIG_PATH)"; \
+	else \
+		echo "Config already exists at $(CONFIG_PATH)"; \
+	fi
+
+uninstall: ## Remove the linked CLI
+	@rm -f "$(INSTALL_PATH)"
+	@echo "Removed $(INSTALL_PATH)"
+
+lint: install-dev ## Run Python and Markdown checks
+	$(PY) -m ruff check src tests main.py
+	$(PY) -m ruff format --check src tests main.py
+	markdownlint --config .markdownlint.json $(MARKDOWN_FILES)
+	shellcheck --enable=all scripts/*.sh
+
+test: install-dev ## Run regression tests
+	$(PY) -m pytest -q
+
+run: install ## Show CLI help
+	"$(INSTALL_PATH)" --help
+
+clean: ## Remove local build and virtualenv artifacts
+	rm -rf $(VENV) .ruff_cache build dist src/*.egg-info(N) *.egg-info(N)

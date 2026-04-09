@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+outputs/
+*.pyc
+.DS_Store
+config.toml
+*.csv
+*.xlsx
+response_data*.json
+tricount-info.json
+Attachments */

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tricount-exporter config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tricount_key": {
+      "type": "string",
+      "description": "Optional default public Tricount key."
+    },
+    "output_dir": {
+      "type": "string",
+      "description": "Base output directory for per-key exports."
+    },
+    "download_attachments": {
+      "type": "boolean"
+    },
+    "write_excel": {
+      "type": "boolean"
+    },
+    "write_sesterce": {
+      "type": "boolean"
+    },
+    "save_response": {
+      "type": "boolean"
+    },
+    "response_file_name": {
+      "type": "string"
+    }
+  }
+}
