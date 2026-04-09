@@ -12,7 +12,6 @@ CONFIG_PATH ?= $(CONFIG_DIR)/config.toml
 APP_HOME ?= $(HOME)/.local/share/$(INSTALL_NAME)
 APP_VENV ?= $(APP_HOME)/venv
 APP_PIP ?= $(APP_VENV)/bin/pip
-SYSTEM_SITE_PACKAGES ?= $(shell python3 -c "import site; print(site.getsitepackages()[0])")
 
 .DEFAULT_GOAL := help
 
@@ -51,18 +50,23 @@ app-venv: ## Create the standalone runtime virtual environment
 	$(APP_PIP) install --upgrade pip
 
 install: check-deps app-venv ## Install the CLI in a standalone user venv
-	PYTHONPATH="$(SYSTEM_SITE_PACKAGES):$${PYTHONPATH:-}" $(APP_PIP) install --no-build-isolation .
+	@SRC_SITE_PACKAGES="$$(PYTHONPATH=src $(PY) -c 'import site; print(site.getsitepackages()[0])')"; \
+	APP_SITE_PACKAGES="$$( "$(APP_VENV)/bin/python" -c 'import site; print(site.getsitepackages()[0])' )"; \
+	mkdir -p "$(APP_HOME)/src" "$$APP_SITE_PACKAGES"; \
+	rsync -a --delete "$$SRC_SITE_PACKAGES"/ "$$APP_SITE_PACKAGES/"; \
+	rsync -a src/tricount_exporter "$$APP_SITE_PACKAGES/"; \
+	cp scripts/tricount-exporter.sh "$(INSTALL_PATH)"; \
+	chmod +x "$(INSTALL_PATH)"
 	@$(MAKE) install-link install-config
 
 install-dev: check-deps venv ## Install repo-local dev dependencies
-	PYTHONPATH="$(SYSTEM_SITE_PACKAGES):$${PYTHONPATH:-}" $(PIP) install --no-build-isolation -e ".[dev]"
+	$(PIP) install -e ".[dev]"
 	@$(MAKE) install-config
 
 install-link: ## Link the standalone runtime CLI into ~/.local/bin
 	@mkdir -p "$(BINDIR)"
-	@[[ -x "$(APP_VENV)/bin/$(INSTALL_NAME)" ]] \
-		|| { echo "$(APP_VENV)/bin/$(INSTALL_NAME) not found. Run 'make install' first."; exit 1; }
-	@ln -sf "$(APP_VENV)/bin/$(INSTALL_NAME)" "$(INSTALL_PATH)"
+	@[[ -x "$(INSTALL_PATH)" ]] \
+		|| { echo "$(INSTALL_PATH) not found. Run 'make install' first."; exit 1; }
 	@echo "Installed $(INSTALL_NAME) -> $(INSTALL_PATH)"
 
 install-config: ## Install the example config if it does not exist yet

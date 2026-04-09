@@ -12,7 +12,6 @@ All notable changes to this project are documented in this file.
 - Updated the config schema, examples, and developer notes to match the
   current CLI behavior.
 
-
 ### Changed
 
 - Renamed the rewritten project to `tricount-exporter`.
