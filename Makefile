@@ -10,10 +10,14 @@ INSTALL_NAME ?= tricount-exporter
 INSTALL_PATH ?= $(BINDIR)/$(INSTALL_NAME)
 CONFIG_DIR ?= $(HOME)/.config/tricount-exporter
 CONFIG_PATH ?= $(CONFIG_DIR)/config.toml
+APP_HOME ?= $(HOME)/.local/share/$(INSTALL_NAME)
+APP_VENV ?= $(APP_HOME)/venv
+APP_PY ?= $(APP_VENV)/bin/python
+APP_PIP ?= $(APP_VENV)/bin/pip
 
 .DEFAULT_GOAL := help
 
-.PHONY: help check-deps venv install install-dev install-link install-config uninstall lint test run clean
+.PHONY: help check-deps venv app-venv install install-dev install-link install-config uninstall lint test run clean
 
 help: ## Show available targets
 	@awk 'BEGIN { FS = ":.*##" } /^[a-zA-Z_-]+:.*##/ { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -38,19 +42,26 @@ venv: ## Create the virtual environment
 	fi
 	$(PIP) install --upgrade pip
 
-install: check-deps venv ## Install the CLI and link it into ~/.local/bin
-	$(PIP) install -e .
+app-venv: ## Create the standalone runtime virtual environment
+	@mkdir -p "$(APP_HOME)"
+	@if [[ ! -d "$(APP_VENV)" ]]; then \
+		python3 -m venv "$(APP_VENV)"; \
+	fi
+	$(APP_PIP) install --upgrade pip
+
+install: check-deps app-venv ## Install the CLI in a standalone user venv
+	$(APP_PIP) install .
 	@$(MAKE) install-link install-config
 
-install-dev: check-deps venv ## Install the CLI with dev dependencies
+install-dev: check-deps venv ## Install repo-local dev dependencies
 	$(PIP) install -e ".[dev]"
-	@$(MAKE) install-link install-config
+	@$(MAKE) install-config
 
-install-link: ## Link the installed CLI into ~/.local/bin
+install-link: ## Link the standalone runtime CLI into ~/.local/bin
 	@mkdir -p "$(BINDIR)"
-	@[[ -x "$(CURDIR)/$(VENV)/bin/$(INSTALL_NAME)" ]] \
-		|| { echo "$(CURDIR)/$(VENV)/bin/$(INSTALL_NAME) not found. Run 'make install' first."; exit 1; }
-	@ln -sf "$(CURDIR)/$(VENV)/bin/$(INSTALL_NAME)" "$(INSTALL_PATH)"
+	@[[ -x "$(APP_VENV)/bin/$(INSTALL_NAME)" ]] \
+		|| { echo "$(APP_VENV)/bin/$(INSTALL_NAME) not found. Run 'make install' first."; exit 1; }
+	@ln -sf "$(APP_VENV)/bin/$(INSTALL_NAME)" "$(INSTALL_PATH)"
 	@echo "Installed $(INSTALL_NAME) -> $(INSTALL_PATH)"
 
 install-config: ## Install the example config if it does not exist yet
@@ -62,8 +73,9 @@ install-config: ## Install the example config if it does not exist yet
 		echo "Config already exists at $(CONFIG_PATH)"; \
 	fi
 
-uninstall: ## Remove the linked CLI
+uninstall: ## Remove the linked CLI and standalone runtime environment
 	@rm -f "$(INSTALL_PATH)"
+	@rm -rf "$(APP_HOME)"
 	@echo "Removed $(INSTALL_PATH)"
 
 lint: install-dev ## Run Python and Markdown checks

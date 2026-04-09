@@ -49,14 +49,21 @@ maintenance direction.
 
 ## Requirements
 
+For end users:
+
 - macOS or Linux
 - Python 3.11+
+- `make`
+
+For contributors:
+
 - `markdownlint` for Markdown validation
 - `shellcheck` for shell script validation
 
 ## Install
 
-Clone the repository and install from the project root:
+For a normal user install, clone the repository, run the installer once, and
+then use the installed CLI from anywhere:
 
 ```bash
 git clone <repo-url>
@@ -66,8 +73,9 @@ make install
 
 `make install`:
 
-- creates `.venv`
-- installs the package in editable mode
+- creates a standalone runtime environment in
+  `~/.local/share/tricount-exporter/venv`
+- installs the package into that runtime environment
 - links the CLI to `~/.local/bin/tricount-exporter`
 - installs a default config template to
   `~/.config/tricount-exporter/config.toml` if one does not exist yet
@@ -75,11 +83,23 @@ make install
 If `~/.local/bin` is not on your `PATH`, `make check-deps` tells you what to
 add to your shell profile.
 
+This means the installed `tricount-exporter` command keeps working even if you
+later delete or move the source checkout.
+
 You can also run the installer wrapper directly:
 
 ```bash
 ./scripts/install.sh
 ```
+
+Verify the install:
+
+```bash
+tricount-exporter --version
+tricount-exporter
+```
+
+The second command prints the help text when you run it without parameters.
 
 ## Configuration
 
@@ -237,6 +257,9 @@ Install the dev environment:
 ```bash
 make install-dev
 ```
+
+`make install-dev` is for working on the repository itself. It uses the local
+`.venv` and does not define the user-facing installed command.
 
 Run checks:
 
