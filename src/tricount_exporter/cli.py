@@ -18,6 +18,8 @@ import requests
 import rsa
 from tqdm import tqdm
 
+from . import __version__
+
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "tricount-exporter" / "config.toml"
 INFO_FILE_NAME = "tricount-info.json"
 
@@ -362,6 +364,11 @@ def build_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument(
+        "--version",
+        action="version",
+        version=f"tricount-exporter {__version__}",
+    )
+    parser.add_argument(
         "--key",
         help="Public Tricount key. Overrides any value set in the config file.",
     )
@@ -466,6 +473,11 @@ def export_tricount(settings: AppConfig) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
+    if argv is None:
+        argv = sys.argv[1:]
+    if not argv:
+        parser.print_help()
+        return 0
     args = parser.parse_args(argv)
 
     try:

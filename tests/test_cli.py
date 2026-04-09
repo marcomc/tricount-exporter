@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from tricount_exporter import cli
 
 
@@ -37,12 +39,22 @@ def fake_download(monkeypatch) -> list[tuple[str, Path]]:
     return downloaded
 
 
-def test_main_requires_key_when_not_in_config(capsys) -> None:
+def test_main_prints_help_when_called_without_arguments(capsys) -> None:
     exit_code = cli.main([])
 
     captured = capsys.readouterr()
-    assert exit_code == 1
-    assert "A Tricount key is required" in captured.err
+    assert exit_code == 0
+    assert "usage:" in captured.out
+    assert "--key" in captured.out
+
+
+def test_main_version_prints_cli_version(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["--version"])
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert captured.out.strip() == f"tricount-exporter {cli.__version__}"
 
 
 def test_cli_exports_csv_attachments_and_metadata(

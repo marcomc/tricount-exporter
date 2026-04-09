@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+All notable changes to this project are documented in this file.
+
+## [Unreleased]
+
+## [0.1.0] - 2026-04-09 - initial standalone rewrite
+
+### Changed
 
 - Renamed the rewritten project to `tricount-exporter`.
 - Refactored the downloader into an installable CLI package.
