@@ -49,9 +49,6 @@
     },
     "save_response": {
       "type": "boolean"
-    },
-    "response_file_name": {
-      "type": "string"
     }
   }
 }

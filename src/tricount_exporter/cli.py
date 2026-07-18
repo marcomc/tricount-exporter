@@ -31,6 +31,12 @@ def sanitize_path_component(value: str) -> str:
     return sanitized.strip("-") or "tricount"
 
 
+def sanitize_file_component(value: str) -> str:
+    """Return a portable lowercase filename component."""
+    sanitized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
+    return sanitized.strip("-") or "tricount"
+
+
 def parse_bool(value: Any, default: bool) -> bool:
     if value is None:
         return default
@@ -181,7 +187,6 @@ class AppConfig:
     write_excel: bool = False
     write_sesterce: bool = False
     save_response: bool = False
-    response_file_name: str = "response_data.json"
     dry_run: bool = False
 
     @property
@@ -263,6 +268,22 @@ class TricountAPI:
 
 class TricountHandler:
     @staticmethod
+    def member_names(memberships: list[dict[str, str]]) -> list[str]:
+        return sorted(member["Name"] for member in memberships)
+
+    @staticmethod
+    def transaction_datetime(value: str) -> datetime:
+        return datetime.fromisoformat(value)
+
+    @staticmethod
+    def effective_category(transaction: dict[str, Any]) -> str:
+        custom_category = transaction["Custom Category"]
+        if custom_category:
+            return cast(str, custom_category)
+        category = transaction["Category"]
+        return "" if category == "UNCATEGORIZED" else cast(str, category)
+
+    @staticmethod
     def get_tricount_title(data: dict[str, Any]) -> str:
         return cast(str, data["Response"][0]["Registry"]["title"])
 
@@ -282,24 +303,48 @@ class TricountHandler:
             who_paid = transaction["membership_owned"]["RegistryMembershipNonUser"]["alias"][
                 "display_name"
             ]
-            shares = {
-                allocation["membership"]["RegistryMembershipNonUser"]["alias"]["display_name"]: abs(
-                    float(allocation["amount"]["value"])
-                )
-                for allocation in transaction["allocations"]
-            }
+            allocations: dict[str, dict[str, Any]] = {}
+            for allocation in transaction["allocations"]:
+                member_name = allocation["membership"]["RegistryMembershipNonUser"]["alias"][
+                    "display_name"
+                ]
+                amount = allocation["amount"]
+                amount_local = allocation.get("amount_local", amount)
+                allocations[member_name] = {
+                    "Amount": abs(float(amount["value"])),
+                    "Currency": amount.get("currency", transaction["amount"]["currency"]),
+                    "Local Amount": abs(float(amount_local["value"])),
+                    "Local Currency": amount_local.get(
+                        "currency", amount.get("currency", transaction["amount"]["currency"])
+                    ),
+                    "Type": allocation.get("type", ""),
+                    "Share Ratio": allocation.get("share_ratio", ""),
+                }
+
+            amount = transaction["amount"]
+            amount_local = transaction.get("amount_local", amount)
 
             transactions.append(
                 {
-                    "Type": transaction["type_transaction"],
+                    "Transaction ID": transaction.get("id", ""),
+                    "Transaction UUID": transaction.get("uuid", ""),
+                    "Status": transaction.get("status", ""),
+                    "Entry Type": transaction.get("type", ""),
+                    "Transaction Type": transaction["type_transaction"],
                     "Who Paid": who_paid,
-                    "Total": float(transaction["amount"]["value"]) * -1,
-                    "Currency": transaction["amount"]["currency"],
+                    "Total": float(amount["value"]) * -1,
+                    "Currency": amount["currency"],
+                    "Local Total": float(amount_local["value"]) * -1,
+                    "Local Currency": amount_local.get("currency", amount["currency"]),
+                    "Exchange Rate": transaction.get("exchange_rate", "1"),
                     "Description": transaction.get("description", ""),
                     "When": transaction["date"],
-                    "Shares": shares,
+                    "Allocations": allocations,
                     "Category": transaction["category"],
+                    "Custom Category": transaction.get("category_custom") or "",
                     "Attachments": transaction.get("attachment", []),
+                    "Created": transaction.get("created", ""),
+                    "Updated": transaction.get("updated", ""),
                 }
             )
 
@@ -340,29 +385,87 @@ class TricountHandler:
         file_path.write_bytes(response.content)
 
     @staticmethod
-    def prepare_transaction_data(transaction: dict[str, Any]) -> list[Any]:
-        involved = ", ".join(name for name, amount in transaction["Shares"].items() if amount > 0)
+    def human_export_headers(members: list[str]) -> list[str]:
+        return (
+            [
+                "Date",
+                "Time",
+                "Description",
+                "Who Paid",
+                "Total",
+                "Currency",
+                "Local Total",
+                "Local Currency",
+                "Exchange Rate",
+            ]
+            + [f"Share {member}" for member in members]
+            + [f"Local Share {member}" for member in members]
+            + [f"Allocation Type {member}" for member in members]
+            + [f"Share Ratio {member}" for member in members]
+            + [
+                "Category",
+                "Custom Category",
+                "Transaction Type",
+                "Entry Type",
+                "Status",
+                "Involved",
+                "File Names",
+                "Attachment URLs",
+                "Transaction ID",
+                "Transaction UUID",
+                "Created",
+                "Updated",
+            ]
+        )
+
+    @staticmethod
+    def prepare_transaction_data(transaction: dict[str, Any], members: list[str]) -> list[Any]:
+        allocations = transaction["Allocations"]
+        involved = ", ".join(
+            member for member in members if allocations.get(member, {}).get("Amount", 0) > 0
+        )
         attachment_urls = ", ".join(
             attachment["urls"][0]["url"]
             for attachment in transaction["Attachments"]
             if "urls" in attachment and attachment["urls"]
         )
 
-        return [
-            transaction["Who Paid"],
-            transaction["Total"],
-            transaction["Currency"],
-            transaction["Description"],
-            datetime.strptime(transaction["When"], "%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d"),
-            involved,
-            transaction.get("File Names", ""),
-            attachment_urls,
-            transaction["Category"],
-        ]
+        transaction_datetime = TricountHandler.transaction_datetime(transaction["When"])
+        return (
+            [
+                transaction_datetime.strftime("%Y-%m-%d"),
+                transaction_datetime.strftime("%H:%M:%S"),
+                transaction["Description"],
+                transaction["Who Paid"],
+                transaction["Total"],
+                transaction["Currency"],
+                transaction["Local Total"],
+                transaction["Local Currency"],
+                transaction["Exchange Rate"],
+            ]
+            + [allocations.get(member, {}).get("Amount", 0.0) for member in members]
+            + [allocations.get(member, {}).get("Local Amount", 0.0) for member in members]
+            + [allocations.get(member, {}).get("Type", "") for member in members]
+            + [allocations.get(member, {}).get("Share Ratio", "") for member in members]
+            + [
+                transaction["Category"],
+                transaction["Custom Category"],
+                transaction["Transaction Type"],
+                transaction["Entry Type"],
+                transaction["Status"],
+                involved,
+                transaction.get("File Names", ""),
+                attachment_urls,
+                transaction["Transaction ID"],
+                transaction["Transaction UUID"],
+                transaction["Created"],
+                transaction["Updated"],
+            ]
+        )
 
     @staticmethod
     def transaction_date(transaction: dict[str, Any]) -> date:
-        return datetime.strptime(transaction["When"], "%Y-%m-%d %H:%M:%S.%f").date()
+        return TricountHandler.transaction_datetime(transaction["When"]).date()
 
     @staticmethod
     def filter_transactions_by_date(
@@ -389,75 +492,58 @@ class TricountHandler:
     ) -> list[Any]:
         paid_by = [0.0] * len(members)
         payer = transaction["Who Paid"]
-        paid_by[members.index(payer)] = transaction["Total"]
+        paid_by[members.index(payer)] = transaction["Local Total"]
 
         paid_for = [0.0] * len(members)
-        for paid_for_member, amount in transaction["Shares"].items():
-            paid_for[members.index(paid_for_member)] = amount
+        for paid_for_member, allocation in transaction["Allocations"].items():
+            paid_for[members.index(paid_for_member)] = allocation["Local Amount"]
 
-        category = ""
-        type_transaction = transaction["Type"]
+        type_transaction = transaction["Transaction Type"]
         if type_transaction == "BALANCE":
-            category = "Money Transfer"
-        elif type_transaction == "INCOME":
+            category = transaction["Custom Category"] or "Money Transfer"
+        else:
+            category = TricountHandler.effective_category(transaction)
+        if type_transaction == "INCOME":
             paid_for = [-amount for amount in paid_for]
-            if transaction["Category"] != "UNCATEGORIZED":
-                category = transaction["Category"]
-        elif type_transaction == "NORMAL" and transaction["Category"] != "UNCATEGORIZED":
-            category = transaction["Category"]
 
         return [
-            datetime.strptime(transaction["When"], "%Y-%m-%d %H:%M:%S.%f").strftime("%Y-%m-%d"),
+            TricountHandler.transaction_datetime(transaction["When"]).strftime("%Y-%m-%d"),
             transaction["Description"],
             *paid_by,
             *paid_for,
-            transaction["Currency"],
+            transaction["Local Currency"],
             category,
+            transaction["Exchange Rate"],
         ]
 
     @staticmethod
-    def write_to_excel(transactions: list[dict[str, Any]], file_path: Path) -> None:
+    def write_to_excel(
+        memberships: list[dict[str, str]], transactions: list[dict[str, Any]], file_path: Path
+    ) -> None:
         workbook = openpyxl.Workbook()
         sheet = workbook.active
         sheet.title = "Tricount Transactions"
-
-        headers = [
-            "Who Paid",
-            "Total",
-            "Currency",
-            "Description",
-            "When",
-            "Involved",
-            "File Names",
-            "Attachment URLs",
-            "Category",
-        ]
-        sheet.append(headers)
+        members = TricountHandler.member_names(memberships)
+        sheet.append(TricountHandler.human_export_headers(members))
 
         for transaction in transactions:
-            sheet.append(TricountHandler.prepare_transaction_data(transaction))
+            sheet.append(TricountHandler.prepare_transaction_data(transaction, members))
 
         workbook.save(file_path)
         print(f"Transactions saved to {file_path}")
 
     @staticmethod
-    def write_to_csv(transactions: list[dict[str, Any]], file_path: Path) -> None:
+    def write_to_csv(
+        memberships: list[dict[str, str]], transactions: list[dict[str, Any]], file_path: Path
+    ) -> None:
+        members = TricountHandler.member_names(memberships)
         with file_path.open("w", encoding="utf-8", newline="") as csv_file:
-            headers = [
-                "Who Paid",
-                "Total",
-                "Currency",
-                "Description",
-                "When",
-                "Involved",
-                "File Names",
-                "Attachment URLs",
-                "Category",
-            ]
             transaction_writer = csv.writer(csv_file, delimiter=";")
-            transaction_writer.writerow(headers)
+            transaction_writer.writerow(TricountHandler.human_export_headers(members))
             for transaction in transactions:
-                transaction_writer.writerow(TricountHandler.prepare_transaction_data(transaction))
+                transaction_writer.writerow(
+                    TricountHandler.prepare_transaction_data(transaction, members)
+                )
 
         print(f"Transactions saved to {file_path}")
 
@@ -467,14 +553,14 @@ class TricountHandler:
         transactions: list[dict[str, Any]],
         file_path: Path,
     ) -> None:
-        members = sorted(member["Name"] for member in memberships)
+        members = TricountHandler.member_names(memberships)
 
         with file_path.open("w", encoding="utf-8", newline="") as csv_file:
             headers = (
                 ["Date", "Title"]
                 + [f"Paid by {member}" for member in members]
                 + [f"Paid for {member}" for member in members]
-                + ["Currency", "Category"]
+                + ["Currency", "Category", "Exchange rate"]
             )
             transaction_writer = csv.writer(csv_file, delimiter=",")
             transaction_writer.writerow(headers)
@@ -515,7 +601,6 @@ def load_config(config_path: Path | None) -> AppConfig:
         write_excel=parse_bool(raw_config.get("write_excel"), AppConfig.write_excel),
         write_sesterce=parse_bool(raw_config.get("write_sesterce"), AppConfig.write_sesterce),
         save_response=parse_bool(raw_config.get("save_response"), AppConfig.save_response),
-        response_file_name=raw_config.get("response_file_name", "response_data.json"),
     )
 
 
@@ -563,6 +648,7 @@ def build_export_plan(
         settings.output_dir, tricount_title, tricount_input.public_identifier_token
     )
     safe_title = sanitize_path_component(tricount_title)
+    file_stem = sanitize_file_component(tricount_title)
     source_url = tricount_input.source_url
 
     return ExportPlan(
@@ -570,12 +656,12 @@ def build_export_plan(
         tricount_title=tricount_title,
         source_url=source_url,
         export_dir=export_dir,
-        csv_path=export_dir / f"Transactions {safe_title}.csv",
+        csv_path=export_dir / f"transactions-{file_stem}.csv",
         excel_path=(
-            export_dir / f"Transactions {safe_title}.xlsx" if settings.write_excel else None
+            export_dir / f"transactions-{file_stem}.xlsx" if settings.write_excel else None
         ),
         sesterce_path=(
-            export_dir / f"Transactions {safe_title} (Sesterce).csv"
+            export_dir / f"transactions-{file_stem}-sesterce.csv"
             if settings.write_sesterce
             else None
         ),
@@ -583,7 +669,7 @@ def build_export_plan(
             export_dir / f"Attachments {safe_title}" if settings.download_attachments else None
         ),
         response_path=(
-            export_dir / settings.response_file_name if settings.save_response else None
+            export_dir / f"transactions-{file_stem}.json" if settings.save_response else None
         ),
         memberships=memberships,
         transactions=transactions,
@@ -708,7 +794,6 @@ def resolve_settings(args: argparse.Namespace) -> AppConfig:
             config.write_sesterce if args.write_sesterce is None else args.write_sesterce
         ),
         save_response=config.save_response if args.save_response is None else args.save_response,
-        response_file_name=config.response_file_name,
         dry_run=args.dry_run,
     )
 
@@ -726,20 +811,29 @@ def export_single_tricount(
     plan.export_dir.mkdir(parents=True, exist_ok=True)
     write_tricount_info(plan.export_dir, plan.tricount_title, plan.tricount_key, plan.source_url)
     safe_title = sanitize_path_component(plan.tricount_title)
+    file_stem = sanitize_file_component(plan.tricount_title)
 
     if plan.excel_path is None:
-        remove_path_if_exists(plan.export_dir / f"Transactions {safe_title}.xlsx")
+        remove_path_if_exists(plan.export_dir / f"transactions-{file_stem}.xlsx")
     if plan.sesterce_path is None:
-        remove_path_if_exists(plan.export_dir / f"Transactions {safe_title} (Sesterce).csv")
+        remove_path_if_exists(plan.export_dir / f"transactions-{file_stem}-sesterce.csv")
     if plan.response_path is None:
-        remove_path_if_exists(plan.export_dir / settings.response_file_name)
+        remove_path_if_exists(plan.export_dir / f"transactions-{file_stem}.json")
     if plan.attachments_dir is None:
         remove_path_if_exists(plan.export_dir / f"Attachments {safe_title}")
 
-    handler.write_to_csv(plan.transactions, file_path=plan.csv_path)
+    for legacy_name in (
+        f"Transactions {safe_title}.csv",
+        f"Transactions {safe_title}.xlsx",
+        f"Transactions {safe_title} (Sesterce).csv",
+        "response_data.json",
+    ):
+        remove_path_if_exists(plan.export_dir / legacy_name)
+
+    handler.write_to_csv(plan.memberships, plan.transactions, file_path=plan.csv_path)
 
     if plan.excel_path is not None:
-        handler.write_to_excel(plan.transactions, file_path=plan.excel_path)
+        handler.write_to_excel(plan.memberships, plan.transactions, file_path=plan.excel_path)
 
     if plan.sesterce_path is not None:
         handler.write_to_sesterce_csv(

@@ -17,6 +17,3 @@ download_attachments = true
 write_excel = false
 write_sesterce = false
 save_response = false
-
-# File name used when save_response = true.
-response_file_name = "response_data.json"

@@ -79,7 +79,7 @@ def test_cli_exports_csv_attachments_and_metadata(
 
     export_dir = tmp_path / "City-trip"
     assert export_dir.is_dir()
-    assert (export_dir / "Transactions City-trip.csv").is_file()
+    assert (export_dir / "transactions-city-trip.csv").is_file()
     assert (export_dir / "Attachments City-trip" / "receipt_1.jpg").is_file()
     assert downloads[0][0] == "https://example.invalid/receipt-1.jpg"
 
@@ -110,9 +110,9 @@ def test_cli_honors_optional_output_flags(
 
     assert exit_code == 0
     export_dir = tmp_path / "City-trip"
-    assert (export_dir / "Transactions City-trip.xlsx").is_file()
-    assert (export_dir / "Transactions City-trip (Sesterce).csv").is_file()
-    assert (export_dir / "response_data.json").is_file()
+    assert (export_dir / "transactions-city-trip.xlsx").is_file()
+    assert (export_dir / "transactions-city-trip-sesterce.csv").is_file()
+    assert (export_dir / "transactions-city-trip.json").is_file()
 
 
 def test_cli_dry_run_validates_and_prints_paths_without_writing_files(
@@ -140,7 +140,7 @@ def test_cli_dry_run_validates_and_prints_paths_without_writing_files(
     assert fake_api.fetched_keys == ["key-123456"]
     assert "Dry run: validated Tricount key and planned outputs." in captured.out
     assert f"Export directory: {tmp_path / 'City-trip'}" in captured.out
-    assert f"CSV: {tmp_path / 'City-trip' / 'Transactions City-trip.csv'}" in captured.out
+    assert f"CSV: {tmp_path / 'City-trip' / 'transactions-city-trip.csv'}" in captured.out
     assert downloads == []
     assert not (tmp_path / "City-trip").exists()
 
@@ -186,10 +186,10 @@ def test_cli_clears_stale_outputs_on_reuse(
     assert first_exit_code == 0
 
     export_dir = tmp_path / "City-trip"
-    assert (export_dir / "Transactions City-trip.csv").is_file()
-    assert (export_dir / "Transactions City-trip.xlsx").is_file()
-    assert (export_dir / "Transactions City-trip (Sesterce).csv").is_file()
-    assert (export_dir / "response_data.json").is_file()
+    assert (export_dir / "transactions-city-trip.csv").is_file()
+    assert (export_dir / "transactions-city-trip.xlsx").is_file()
+    assert (export_dir / "transactions-city-trip-sesterce.csv").is_file()
+    assert (export_dir / "transactions-city-trip.json").is_file()
     assert (export_dir / "Attachments City-trip" / "receipt_1.jpg").is_file()
 
     second_exit_code = cli.main(
@@ -205,10 +205,10 @@ def test_cli_clears_stale_outputs_on_reuse(
     assert second_exit_code == 0
     assert fake_api.fetched_keys == ["key-123456", "key-123456"]
     assert len(downloads) == 1
-    assert (export_dir / "Transactions City-trip.csv").is_file()
-    assert not (export_dir / "Transactions City-trip.xlsx").exists()
-    assert not (export_dir / "Transactions City-trip (Sesterce).csv").exists()
-    assert not (export_dir / "response_data.json").exists()
+    assert (export_dir / "transactions-city-trip.csv").is_file()
+    assert not (export_dir / "transactions-city-trip.xlsx").exists()
+    assert not (export_dir / "transactions-city-trip-sesterce.csv").exists()
+    assert not (export_dir / "transactions-city-trip.json").exists()
     assert not (export_dir / "Attachments City-trip").exists()
 
 
@@ -249,7 +249,7 @@ def test_cli_supports_multiple_keys_urls_and_shared_folders(
     ]
     for export_dir in export_dirs:
         assert export_dir.is_dir()
-        assert (export_dir / "Transactions City-trip.csv").is_file()
+        assert (export_dir / "transactions-city-trip.csv").is_file()
         assert (export_dir / "Attachments City-trip" / "receipt_1.jpg").is_file()
 
     assert len(downloads) == 4
@@ -278,7 +278,7 @@ def test_cli_filters_transactions_by_date_window(
 
     assert exit_code == 0
     export_dir = tmp_path / "City-trip"
-    csv_path = export_dir / "Transactions City-trip.csv"
+    csv_path = export_dir / "transactions-city-trip.csv"
     assert csv_path.is_file()
     assert not (export_dir / "Attachments City-trip").exists()
     assert downloads == []
@@ -287,18 +287,101 @@ def test_cli_filters_transactions_by_date_window(
         rows = list(csv.reader(handle, delimiter=";"))
 
     assert rows[0] == [
+        "Date",
+        "Time",
+        "Description",
         "Who Paid",
         "Total",
         "Currency",
-        "Description",
-        "When",
+        "Local Total",
+        "Local Currency",
+        "Exchange Rate",
+        "Share Giulia",
+        "Share Marco",
+        "Local Share Giulia",
+        "Local Share Marco",
+        "Allocation Type Giulia",
+        "Allocation Type Marco",
+        "Share Ratio Giulia",
+        "Share Ratio Marco",
+        "Category",
+        "Custom Category",
+        "Transaction Type",
+        "Entry Type",
+        "Status",
         "Involved",
         "File Names",
         "Attachment URLs",
-        "Category",
+        "Transaction ID",
+        "Transaction UUID",
+        "Created",
+        "Updated",
     ]
     assert len(rows) == 2
-    assert rows[1][3] == "Museum"
+    assert rows[1][2] == "Museum"
+
+
+def test_csv_exports_preserve_rich_allocations_and_sesterce_fields(
+    monkeypatch, sample_rich_api_response: dict, tmp_path: Path
+) -> None:
+    install_fake_api(monkeypatch, sample_rich_api_response)
+    fake_download(monkeypatch)
+
+    exit_code = cli.main(
+        [
+            "--key",
+            "key-123456",
+            "--output-dir",
+            str(tmp_path),
+            "--no-download-attachments",
+            "--write-sesterce",
+        ]
+    )
+
+    assert exit_code == 0
+    export_dir = tmp_path / "City-trip"
+    with (export_dir / "transactions-city-trip.csv").open(encoding="utf-8", newline="") as handle:
+        human_rows = list(csv.DictReader(handle, delimiter=";"))
+    with (export_dir / "transactions-city-trip-sesterce.csv").open(
+        encoding="utf-8", newline=""
+    ) as handle:
+        sesterce_rows = list(csv.DictReader(handle))
+
+    human_row = human_rows[0]
+    assert human_row["Share Marco"] == "7.0"
+    assert human_row["Share Giulia"] == "29.0"
+    assert human_row["Local Share Marco"] == "5.83"
+    assert human_row["Local Share Giulia"] == "24.17"
+    assert human_row["Allocation Type Marco"] == "AMOUNT"
+    assert human_row["Allocation Type Giulia"] == "RATIO"
+    assert human_row["Share Ratio Giulia"] == "4"
+    assert human_row["Custom Category"] == "Brasserie 🍔"
+    assert human_row["Transaction ID"] == "123456789"
+    assert human_row["Transaction UUID"] == "9c18864f-0e6d-413d-aad7-592d0b99d237"
+
+    sesterce_row = sesterce_rows[0]
+    assert sesterce_row["Paid by Marco"] == "30.0"
+    assert sesterce_row["Paid for Marco"] == "5.83"
+    assert sesterce_row["Paid for Giulia"] == "24.17"
+    assert sesterce_row["Currency"] == "GBP"
+    assert sesterce_row["Category"] == "Brasserie 🍔"
+    assert sesterce_row["Exchange rate"] == "1.2"
+
+
+def test_sesterce_balance_uses_custom_category_or_transfer_fallback(
+    sample_rich_api_response: dict,
+) -> None:
+    memberships, transactions = cli.TricountHandler.parse_tricount_data(sample_rich_api_response)
+    members = cli.TricountHandler.member_names(memberships)
+    transaction = transactions[0]
+    transaction["Transaction Type"] = "BALANCE"
+
+    custom_row = cli.TricountHandler.prepare_sesterce_transaction_data(transaction, members)
+    assert custom_row[-2] == "Brasserie 🍔"
+
+    transaction["Custom Category"] = ""
+    fallback_row = cli.TricountHandler.prepare_sesterce_transaction_data(transaction, members)
+    assert fallback_row[-2] == "Money Transfer"
 
 
 def test_cli_reads_key_from_config(
@@ -325,9 +408,9 @@ def test_cli_reads_key_from_config(
     assert exit_code == 0
     assert fake_api.fetched_keys == ["config-key"]
     export_dir = tmp_path / "City-trip"
-    assert (export_dir / "Transactions City-trip.xlsx").is_file()
-    assert (export_dir / "Transactions City-trip (Sesterce).csv").is_file()
-    assert (export_dir / "response_data.json").is_file()
+    assert (export_dir / "transactions-city-trip.xlsx").is_file()
+    assert (export_dir / "transactions-city-trip-sesterce.csv").is_file()
+    assert (export_dir / "transactions-city-trip.json").is_file()
     assert not (export_dir / "Attachments City-trip").exists()
 
 
