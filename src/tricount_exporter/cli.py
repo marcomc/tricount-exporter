@@ -360,32 +360,38 @@ class TricountHandler:
         return memberships, transactions
 
     @staticmethod
-    def download_attachments(transactions: list[dict[str, Any]], download_folder: Path) -> None:
+    def prepare_attachment_downloads(
+        transactions: list[dict[str, Any]],
+    ) -> list[tuple[str, str]]:
         file_counter = 1
-        total_files = sum(len(transaction["Attachments"]) for transaction in transactions)
-        print(f"Total attachments: {total_files}")
+        downloads: list[tuple[str, str]] = []
+        for transaction in transactions:
+            attachment_files: list[str] = []
+            for attachment in transaction["Attachments"]:
+                if "urls" not in attachment or not attachment["urls"]:
+                    continue
+                url = attachment["urls"][0]["url"]
+                extension = os.path.splitext(url.split("?")[0])[1] or ".file"
+                file_name = f"receipt_{file_counter}{extension}"
+                downloads.append((url, file_name))
+                attachment_files.append(file_name)
+                file_counter += 1
+            transaction["File Names"] = ", ".join(attachment_files)
+        return downloads
+
+    @staticmethod
+    def download_attachments(downloads: list[tuple[str, str]], download_folder: Path) -> None:
         remove_path_if_exists(download_folder)
 
-        if total_files == 0:
+        if not downloads:
             return
 
         download_folder.mkdir(parents=True, exist_ok=True)
 
-        with tqdm(total=total_files, desc="Downloading attachments") as progress_bar:
-            for transaction in transactions:
-                attachment_files: list[str] = []
-                for attachment in transaction["Attachments"]:
-                    if "urls" not in attachment or not attachment["urls"]:
-                        continue
-                    url = attachment["urls"][0]["url"]
-                    extension = os.path.splitext(url.split("?")[0])[1] or ".file"
-                    file_name = f"receipt_{file_counter}{extension}"
-                    file_path = download_folder / file_name
-                    TricountHandler.download_file(url, file_path)
-                    attachment_files.append(file_name)
-                    file_counter += 1
-                    progress_bar.update(1)
-                transaction["File Names"] = ", ".join(attachment_files)
+        with tqdm(total=len(downloads), desc="Downloading attachments") as progress_bar:
+            for url, file_name in downloads:
+                TricountHandler.download_file(url, download_folder / file_name)
+                progress_bar.update(1)
 
     @staticmethod
     def download_file(url: str, file_path: Path) -> None:
@@ -839,8 +845,9 @@ def export_single_tricount(
     ):
         remove_path_if_exists(plan.export_dir / legacy_name)
 
+    attachment_downloads: list[tuple[str, str]] = []
     if plan.attachments_dir is not None:
-        handler.download_attachments(plan.transactions, download_folder=plan.attachments_dir)
+        attachment_downloads = handler.prepare_attachment_downloads(plan.transactions)
 
     handler.write_to_csv(plan.memberships, plan.transactions, file_path=plan.csv_path)
 
@@ -857,6 +864,9 @@ def export_single_tricount(
     if plan.response_path is not None:
         plan.response_path.write_text(json.dumps(plan.raw_data, indent=2), encoding="utf-8")
         print(f"Raw response saved to {plan.response_path}")
+
+    if plan.attachments_dir is not None:
+        handler.download_attachments(attachment_downloads, download_folder=plan.attachments_dir)
 
     return plan.export_dir
 

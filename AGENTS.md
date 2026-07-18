@@ -245,6 +245,7 @@ The tests currently cover:
 - lossless raw-response save, including when CSV date filters are active
 - rich allocation, currency, category, identifier, and timestamp fields
 - Sesterce expense, balance, and income amount semantics
+- attachment failures preserving transaction export files
 - legacy output-name cleanup
 - explicit-null local-amount fallbacks
 - duplicate participant-name rejection
@@ -301,7 +302,8 @@ When updating behavior:
 - keep `README.md` aligned with actual CLI behavior
 - when generated filenames change, update cleanup migration, `.gitignore`,
   documentation, and regression tests together
-- populate derived attachment metadata before writing CSV or Excel consumers
+- prepare derived attachment metadata before writing CSV or Excel consumers,
+  but defer network downloads until every transaction export is written
 - prefer editing the current implementation rather than reintroducing legacy
   compatibility layers
 - avoid committing generated `*.egg-info` churn unless packaging metadata truly

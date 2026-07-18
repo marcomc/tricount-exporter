@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 
 ## [0.2.0] - 2026-07-18 - richer allocation exports
 
-### Added
+### Added in 0.2.0
 
 - Added per-member base and local shares, allocation types, and share ratios to
   the human-readable CSV and Excel exports.
@@ -17,7 +17,7 @@ All notable changes to this project are documented in this file.
 - Added research notes covering Tricount allocation data and the official
   Sesterce CSV import schema.
 
-### Changed
+### Changed in 0.2.0
 
 - Changed generated filenames to portable lowercase names without spaces or
   parentheses, including `transactions-<title>.json` for the raw API response.
@@ -30,10 +30,12 @@ All notable changes to this project are documented in this file.
 - Changed duplicate participant display names from silent allocation merging
   to an explicit export error.
 
-### Fixed
+### Fixed in 0.2.0
 
 - Fixed attachment filenames being omitted from the human CSV and Excel files
   even when the attachments were downloaded successfully.
+- Fixed attachment timeouts and HTTP failures preventing CSV, Excel, Sesterce,
+  and raw JSON files from being written.
 - Fixed explicit `null` local amounts and exchange rates failing instead of
   using their base-currency defaults.
 

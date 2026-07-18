@@ -8,6 +8,7 @@ from pathlib import Path
 
 import openpyxl
 import pytest
+import requests
 
 from tricount_exporter import cli
 
@@ -114,6 +115,40 @@ def test_cli_exports_csv_attachments_and_metadata(
     assert info["tricount_key"] == "key-123456"
     assert info["source_url"] == "https://tricount.com/key-123456"
     assert "downloaded_at" in info
+
+
+def test_attachment_failure_does_not_prevent_transaction_exports(
+    monkeypatch, sample_api_response: dict, tmp_path: Path
+) -> None:
+    install_fake_api(monkeypatch, sample_api_response)
+
+    def fail_download(_url: str, _file_path: Path) -> None:
+        raise requests.Timeout("attachment timed out")
+
+    monkeypatch.setattr(cli.TricountHandler, "download_file", staticmethod(fail_download))
+
+    exit_code = cli.main(
+        [
+            "--key",
+            "key-123456",
+            "--output-dir",
+            str(tmp_path),
+            "--write-excel",
+            "--write-sesterce",
+            "--save-response",
+        ]
+    )
+
+    export_dir = tmp_path / "City-trip"
+    assert exit_code == 1
+    assert (export_dir / "transactions-city-trip.csv").is_file()
+    assert (export_dir / "transactions-city-trip.xlsx").is_file()
+    assert (export_dir / "transactions-city-trip-sesterce.csv").is_file()
+    assert (export_dir / "transactions-city-trip.json").is_file()
+
+    with (export_dir / "transactions-city-trip.csv").open(encoding="utf-8", newline="") as handle:
+        row = next(csv.DictReader(handle, delimiter=";"))
+    assert row["File Names"] == "receipt_1.jpg"
 
 
 def test_cli_honors_optional_output_flags_and_preserves_raw_response(
