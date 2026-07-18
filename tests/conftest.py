@@ -147,5 +147,45 @@ def sample_api_response_two_transactions() -> dict:
 
 
 @pytest.fixture()
+def sample_rich_api_response(sample_api_response: dict) -> dict:
+    transaction = sample_api_response["Response"][0]["Registry"]["all_registry_entry"][0][
+        "RegistryEntry"
+    ]
+    transaction.update(
+        {
+            "id": 1001,
+            "uuid": "11111111-2222-4333-8444-555555555555",
+            "created": "2026-04-09 18:20:00.000000",
+            "updated": "2026-04-09 18:31:00.000000",
+            "status": "ACTIVE",
+            "type": "MANUAL",
+            "amount": {"value": "-36.00", "currency": "EUR"},
+            "amount_local": {"value": "-30.00", "currency": "GBP"},
+            "exchange_rate": "1.2",
+            "category": "OTHER",
+            "category_custom": "Dining 🍔",
+        }
+    )
+    allocations = transaction["allocations"]
+    allocations[0].update(
+        {
+            "amount": {"value": "-7.00", "currency": "EUR"},
+            "amount_local": {"value": "-5.83", "currency": "GBP"},
+            "type": "AMOUNT",
+            "share_ratio": None,
+        }
+    )
+    allocations[1].update(
+        {
+            "amount": {"value": "-29.00", "currency": "EUR"},
+            "amount_local": {"value": "-24.17", "currency": "GBP"},
+            "type": "RATIO",
+            "share_ratio": 4,
+        }
+    )
+    return sample_api_response
+
+
+@pytest.fixture()
 def config_path(tmp_path: Path) -> Path:
     return tmp_path / "config.toml"

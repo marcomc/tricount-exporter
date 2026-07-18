@@ -9,6 +9,7 @@
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Usage Examples](#usage-examples)
+- [Human-readable CSV](#human-readable-csv)
 - [Sesterce CSV](#sesterce-csv)
 - [Output Layout](#output-layout)
 - [Attribution](#attribution)
@@ -132,7 +133,6 @@ download_attachments = true
 write_excel = false
 write_sesterce = false
 save_response = false
-response_file_name = "response_data.json"
 ```
 
 ## Usage
@@ -254,12 +254,33 @@ tricount-exporter \
   --url "https://tricount.com/KEY_FOUR"
 ```
 
+## Human-readable CSV
+
+The default semicolon-delimited CSV preserves the transaction date and time,
+payer, base and original-currency amounts, exchange rate, built-in and custom
+categories, Tricount identifiers and timestamps, attachment references, and
+transaction type.
+
+For every member it also writes these columns:
+
+- `Share <member>` in the Tricount base currency;
+- `Local Share <member>` in the transaction's original currency;
+- `Allocation Type <member>` (`AMOUNT` or `RATIO`);
+- `Share Ratio <member>` when Tricount stores a ratio.
+
+The optional Excel file uses the same columns.
+
+Participant display names must be unique. The exporter stops with a clear
+error instead of merging allocations into ambiguous duplicate-name columns.
+
 ## Sesterce CSV
 
 A Sesterce-compatible CSV is an export shaped for import into Sesterce, which
 is another shared-expense tool. It is different from the default transaction
 CSV because it is organized around who paid and who each expense was paid for,
-using one column set per member.
+using one column set per member. It uses the original transaction currency and
+amounts, includes Tricount's historical `Exchange rate`, and prefers the custom
+category name when one exists.
 
 Use the default CSV when you want a readable transaction export for inspection,
 archiving, spreadsheets, or your own processing.
@@ -282,10 +303,10 @@ default, based on the Tricount title:
 ```text
 ~/Downloads/
   City-trip/
-    Transactions City-trip.csv
-    Transactions City-trip.xlsx
-    Transactions City-trip (Sesterce).csv
-    response_data.json
+    transactions-city-trip.csv
+    transactions-city-trip.xlsx
+    transactions-city-trip-sesterce.csv
+    transactions-city-trip.json
     Attachments City-trip/
       receipt_1.jpg
       receipt_2.pdf

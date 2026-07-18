@@ -2,6 +2,43 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.0] - 2026-07-18 - richer allocation exports
+
+### Added in 0.2.0
+
+- Added per-member base and local shares, allocation types, and share ratios to
+  the human-readable CSV and Excel exports.
+- Added transaction IDs, UUIDs, timestamps, status, entry type, transaction
+  type, original-currency amounts, exchange rates, and custom categories to the
+  human-readable exports.
+- Added the documented Sesterce `Exchange rate` field and regression coverage
+  for unequal allocations, original currencies, custom categories, and balance
+  category handling.
+- Added research notes covering Tricount allocation data and the official
+  Sesterce CSV import schema.
+
+### Changed in 0.2.0
+
+- Changed generated filenames to portable lowercase names without spaces or
+  parentheses, including `transactions-<title>.json` for the raw API response.
+- Changed Sesterce exports to use the original transaction currency and local
+  allocation amounts while retaining Tricount's historical exchange rate.
+- Changed Sesterce category selection to prefer `category_custom` and use
+  `Money Transfer` for balance entries without a custom category.
+- Removed the configurable raw-response filename in favor of deterministic
+  title-based naming.
+- Changed duplicate participant display names from silent allocation merging
+  to an explicit export error.
+
+### Fixed in 0.2.0
+
+- Fixed attachment filenames being omitted from the human CSV and Excel files
+  even when the attachments were downloaded successfully.
+- Fixed attachment timeouts and HTTP failures preventing CSV, Excel, Sesterce,
+  and raw JSON files from being written.
+- Fixed explicit `null` local amounts and exchange rates failing instead of
+  using their base-currency defaults.
+
 ## [0.1.0] - 2026-04-09 - initial standalone rewrite
 
 ### Added

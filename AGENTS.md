@@ -74,10 +74,10 @@ Example layout:
 ```text
 ~/Downloads/
   City-trip/
-    Transactions City-trip.csv
-    Transactions City-trip.xlsx
-    Transactions City-trip (Sesterce).csv
-    response_data.json
+    transactions-city-trip.csv
+    transactions-city-trip.xlsx
+    transactions-city-trip-sesterce.csv
+    transactions-city-trip.json
     Attachments City-trip/
       receipt_1.jpg
     tricount-info.json
@@ -86,7 +86,11 @@ Example layout:
 Rules:
 
 - Directory names use a sanitized version of the Tricount title.
-- The main CSV file name is `Transactions <sanitized-title>.csv`.
+- Generated filenames use a lowercase title component without spaces or
+  parentheses.
+- The main CSV file name is `transactions-<sanitized-title>.csv`.
+- Optional files use `.xlsx`, `-sesterce.csv`, and `.json` variants of the same
+  stem.
 - Attachments go into `Attachments <sanitized-title>/`.
 - `tricount-info.json` stores:
   - original title
@@ -102,7 +106,7 @@ Rules:
 ## API Notes
 
 The implementation currently lives in
-[`src/tricount_exporter/cli.py`](/Users/mmassari/Development/tricount-exporter/src/tricount_exporter/cli.py).
+[`src/tricount_exporter/cli.py`](src/tricount_exporter/cli.py).
 
 Current API flow:
 
@@ -146,6 +150,8 @@ Important assumptions in the parser:
 - transactions come from `registry["all_registry_entry"]`
 - per-transaction shares come from `transaction["allocations"]`
 - attachment URLs come from `attachment["urls"][0]["url"]`
+- participant display names must be unique because exports use them as column
+  identifiers
 
 The code currently assumes the Tricount API shape above is stable. If exports
 break, inspect the live JSON first before changing transformation logic.
@@ -156,8 +162,9 @@ Default CSV:
 
 - semicolon-delimited
 - one row per transaction
-- includes payer, total, currency, description, date, involved members,
-  attachment file names, attachment URLs, and category
+- includes payer, description, date/time, base and original-currency totals,
+  exchange rate, per-member shares in both currencies, allocation types and
+  ratios, categories, transaction metadata, attachment names, and URLs
 
 Excel export:
 
@@ -175,7 +182,9 @@ Sesterce export:
   - `Paid for <member>` for each sorted member
   - `Currency`
   - `Category`
-- `BALANCE` becomes category `Money Transfer`
+- `Exchange rate`
+- uses original transaction currency and original-currency allocation amounts
+- `BALANCE` uses its custom category or falls back to `Money Transfer`
 - `INCOME` negates the paid-for amounts
 
 ## Installation Modes
@@ -222,8 +231,7 @@ Project-wide policy also requires:
 
 ## Regression Tests
 
-Current regression coverage lives in
-[`tests/test_cli.py`](/Users/mmassari/Development/tricount-exporter/tests/test_cli.py).
+Current regression coverage lives in [`tests/test_cli.py`](tests/test_cli.py).
 
 The tests currently cover:
 
@@ -234,7 +242,13 @@ The tests currently cover:
 - metadata file creation
 - optional Excel output
 - optional Sesterce output
-- optional raw-response save
+- lossless raw-response save, including when CSV date filters are active
+- rich allocation, currency, category, identifier, and timestamp fields
+- Sesterce expense, balance, and income amount semantics
+- attachment failures preserving transaction export files
+- legacy output-name cleanup
+- explicit-null local-amount fallbacks
+- duplicate participant-name rejection
 - disabling attachments
 - reading defaults from config
 - `~` expansion for config-based output directories
@@ -263,8 +277,7 @@ These decisions have already been made and should not be rediscovered:
 
 ## Known Follow-Up Work
 
-The roadmap is tracked in
-[`TODO.md`](/Users/mmassari/Development/tricount-exporter/TODO.md).
+The roadmap is tracked in [`TODO.md`](TODO.md).
 
 The most important pending areas are:
 
@@ -287,6 +300,10 @@ When updating behavior:
 
 - update docs and tests in the same change
 - keep `README.md` aligned with actual CLI behavior
+- when generated filenames change, update cleanup migration, `.gitignore`,
+  documentation, and regression tests together
+- prepare derived attachment metadata before writing CSV or Excel consumers,
+  but defer network downloads until every transaction export is written
 - prefer editing the current implementation rather than reintroducing legacy
   compatibility layers
 - avoid committing generated `*.egg-info` churn unless packaging metadata truly
