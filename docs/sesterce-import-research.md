@@ -21,11 +21,11 @@ is structurally valid:
 Date,Title,Paid by <member>...,Paid for <member>...,Currency,Category,Exchange rate
 ```
 
-It preserves the resolved unequal allocation, including a split such as
-Laura EUR 29 and Marco EUR 7, the original transaction currency, its historical
-exchange rate, and the custom category name. Transaction IDs, attachments,
-timestamps, and the original split method are not part of Sesterce's documented
-CSV import schema.
+It preserves the resolved unequal allocation, including a split such as EUR 29
+for Participant A and EUR 7 for Participant B, the original transaction
+currency, its historical exchange rate, and the custom category name.
+Transaction IDs, attachments, timestamps, and the original split method are
+not part of Sesterce's documented CSV import schema.
 
 The raw Tricount JSON and the Sesterce CSV therefore serve different purposes:
 
@@ -140,8 +140,8 @@ This is a valid implementation of Sesterce method 1. For the EUR 36 example it
 can represent the full allocation as:
 
 ```csv
-Date,Title,Paid by Laura,Paid by Marco,Paid for Laura,Paid for Marco,Currency,Category,Exchange rate
-2026-03-29,Brasserie - birra e patatine e bruschetta,0,36,29,7,EUR,Brasserie,1
+Date,Title,Paid by Participant A,Paid by Participant B,Paid for Participant A,Paid for Participant B,Currency,Category,Exchange rate
+2026-01-15,Example uneven expense,0,36,29,7,EUR,Example category,1
 ```
 
 The values are produced as follows [current-row]:
@@ -270,9 +270,9 @@ Accordingly:
 - [`tricount-exporter` Sesterce CSV writer][current-writer].
 - [`tricount-exporter` current regression tests][current-tests].
 
-[current-row]: https://github.com/marcomc/tricount-exporter/blob/6b02efa42f081542dbd9ea269c376d025b73ed9b/src/tricount_exporter/cli.py#L386-L416
-[current-tests]: https://github.com/marcomc/tricount-exporter/blob/6b02efa42f081542dbd9ea269c376d025b73ed9b/tests/test_cli.py#L90-L116
-[current-writer]: https://github.com/marcomc/tricount-exporter/blob/6b02efa42f081542dbd9ea269c376d025b73ed9b/src/tricount_exporter/cli.py#L465-L485
+[current-row]: ../src/tricount_exporter/cli.py
+[current-tests]: ../tests/test_cli.py
+[current-writer]: ../src/tricount_exporter/cli.py
 [official-categories]: https://sesterce.io/docs/categories/
 [official-currencies]: https://sesterce.io/docs/multi-currencies/
 [official-import]: https://sesterce.io/docs/import/

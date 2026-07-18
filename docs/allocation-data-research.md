@@ -4,7 +4,7 @@
 
 - [Conclusion](#conclusion)
 - [What the Program Downloads](#what-the-program-downloads)
-- [Live Verification: March 2026](#live-verification-march-2026)
+- [Sanitized Live Verification](#sanitized-live-verification)
 - [Where the Original Standard CSV Lost the Data](#where-the-original-standard-csv-lost-the-data)
 - [Relevant Payload Fields](#relevant-payload-fields)
 - [Are Other Endpoints or Files Required?](#are-other-endpoints-or-files-required)
@@ -20,16 +20,18 @@ The standard CSV is not downloaded from Tricount. `tricount-exporter` generates
 it locally from the JSON response. The original formatter discarded allocation
 amounts; the extended human-readable CSV preserves them per participant.
 
-For the expense shown in the screenshot, the live API response contains exactly:
+For the expense shown in the screenshot, the live API response contains the
+following allocation structure. Descriptive and participant data has been
+anonymized; the amounts are retained because they demonstrate the split:
 
 | Field | Value |
 | --- | --- |
-| Description | `Brasserie - birra e patatine e bruschetta` |
-| Date | `2026-03-29 00:47:48.406000` |
-| Payer | Marco |
+| Description | `Example uneven expense` |
+| Date | `2026-01-15 12:00:00.000000` |
+| Payer | Participant B |
 | Total | EUR 36.00 |
-| Laura allocation | EUR 29.00 |
-| Marco allocation | EUR 7.00 |
+| Participant A allocation | EUR 29.00 |
+| Participant B allocation | EUR 7.00 |
 | Allocation type | `AMOUNT` for both participants |
 
 Therefore, this is an exporter-format omission, not missing data in Tricount's
@@ -61,10 +63,11 @@ The current implementation documents this directly in its
 The public Tricount URL is therefore an access token used to request the JSON
 registry. It is not the URL of a pre-generated CSV file.
 
-## Live Verification: March 2026
+## Sanitized Live Verification
 
-On 2026-07-18, a read-only request was made with the locally stored shared key
-for `HoStello - 202603`. No key or session token was recorded in this document.
+On 2026-07-18, a read-only request was made with a locally stored shared key.
+No title, key, session token, original description, date, or participant name
+is recorded in this document.
 
 The matching `RegistryEntry` returned:
 
@@ -73,14 +76,14 @@ The matching `RegistryEntry` returned:
   "amount": {"currency": "EUR", "value": "-36.00"},
   "allocations": [
     {
-      "participant": "Laura",
+      "participant": "Participant A",
       "amount": {"currency": "EUR", "value": "-29.00"},
       "amount_local": {"currency": "EUR", "value": "-29.00"},
       "type": "AMOUNT",
       "share_ratio": null
     },
     {
-      "participant": "Marco",
+      "participant": "Participant B",
       "amount": {"currency": "EUR", "value": "-7.00"},
       "amount_local": {"currency": "EUR", "value": "-7.00"},
       "type": "AMOUNT",
@@ -113,7 +116,7 @@ shares = {
 The resulting internal `Shares` mapping would be:
 
 ```text
-{"Laura": 29.0, "Marco": 7.0}
+{"Participant A": 29.0, "Participant B": 7.0}
 ```
 
 This is visible in the current [allocation parser][current-parser].
@@ -127,9 +130,9 @@ involved = ", ".join(
 )
 ```
 
-The old CSV row consequently contained `Laura, Marco`, not the corresponding 29
-and 7 values. The row construction is shown in the v0.1.0
-[standard-row formatter][current-row]. This behavior was inherited from the
+The old CSV row consequently contained the participant names, not the
+corresponding 29 and 7 values. The row construction is shown in the v0.1.0
+[standard-row formatter][historical-row]. This behavior was inherited from the
 [upstream row formatter][upstream-row].
 
 ## Relevant Payload Fields
@@ -139,15 +142,15 @@ fields relevant to allocation fidelity are:
 
 | JSON path relative to `RegistryEntry` | Meaning |
 | --- | --- |
-| `amount.value` | Total transaction amount; returned with Tricount's sign convention |
-| `amount.currency` | Transaction currency |
-| `amount_local` | Total converted to the registry's local/default currency |
+| `amount.value` | Total converted to the registry/base currency; returned with Tricount's sign convention |
+| `amount.currency` | Registry/base currency |
+| `amount_local` | Total in the original transaction currency |
 | `membership_owned...alias.display_name` | Payer |
 | `allocations[]` | One allocation object per included participant |
 | `allocations[].membership...alias.display_name` | Allocated participant |
-| `allocations[].amount.value` | Participant's allocated amount in transaction currency |
-| `allocations[].amount.currency` | Allocation currency |
-| `allocations[].amount_local` | Participant allocation in local/default currency |
+| `allocations[].amount.value` | Participant allocation converted to the registry/base currency |
+| `allocations[].amount.currency` | Registry/base currency for the allocation |
+| `allocations[].amount_local` | Participant allocation in the original transaction currency |
 | `allocations[].type` | Split mode, observed as `AMOUNT` or `RATIO` |
 | `allocations[].share_ratio` | Ratio weight when the allocation uses `RATIO`; absent or null for `AMOUNT` |
 
@@ -198,7 +201,7 @@ lossless archive from which the CSV files can be regenerated.
 
 - Live Tricount registry response, read-only verification on 2026-07-18.
   Sensitive shared keys and session tokens were not retained in this report.
-- [`tricount-exporter` source at v0.1.0][current-source].
+- [`tricount-exporter` source][current-source].
 - [Original `MrNachoX/tricount-downloader` source][upstream-source].
 - [Original public sample registry payload][upstream-payload].
 - [Tricount help: managing expenses and uneven splits][official-uneven-split].
@@ -206,11 +209,11 @@ lossless archive from which the CSV files can be regenerated.
 - [bunq public API documentation][bunq-api].
 
 [bunq-api]: https://doc.bunq.com/api-reference/start-here
-[current-csv]: https://github.com/marcomc/tricount-exporter/blob/6b02efa42f081542dbd9ea269c376d025b73ed9b/src/tricount_exporter/cli.py#L443-L462
-[current-fetch]: https://github.com/marcomc/tricount-exporter/blob/6b02efa42f081542dbd9ea269c376d025b73ed9b/src/tricount_exporter/cli.py#L220-L261
-[current-parser]: https://github.com/marcomc/tricount-exporter/blob/6b02efa42f081542dbd9ea269c376d025b73ed9b/src/tricount_exporter/cli.py#L269-L304
-[current-row]: https://github.com/marcomc/tricount-exporter/blob/6b02efa42f081542dbd9ea269c376d025b73ed9b/src/tricount_exporter/cli.py#L342-L361
-[current-source]: https://github.com/marcomc/tricount-exporter/tree/6b02efa42f081542dbd9ea269c376d025b73ed9b
+[current-csv]: ../src/tricount_exporter/cli.py
+[current-fetch]: ../src/tricount_exporter/cli.py
+[current-parser]: ../src/tricount_exporter/cli.py
+[current-source]: ../
+[historical-row]: https://github.com/marcomc/tricount-exporter/blob/6b02efa42f081542dbd9ea269c376d025b73ed9b/src/tricount_exporter/cli.py#L342-L361
 [official-export]: https://help.tricount.com/articles/tricount-faqs
 [official-uneven-split]: https://help.tricount.com/articles/how-can-i-manage-my-tricounts-and-expenses
 [upstream-csv]: https://github.com/MrNachoX/tricount-downloader/blob/cf9a7e68b91a1aa4041c6492b04c9796d03256e6/main.py#L214-L238

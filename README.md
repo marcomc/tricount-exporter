@@ -270,6 +270,9 @@ For every member it also writes these columns:
 
 The optional Excel file uses the same columns.
 
+Participant display names must be unique. The exporter stops with a clear
+error instead of merging allocations into ambiguous duplicate-name columns.
+
 ## Sesterce CSV
 
 A Sesterce-compatible CSV is an export shaped for import into Sesterce, which

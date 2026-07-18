@@ -9,6 +9,7 @@ import shutil
 import sys
 import tomllib
 import uuid
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -292,10 +293,18 @@ class TricountHandler:
         data: dict[str, Any],
     ) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
         registry = data["Response"][0]["Registry"]
-        memberships = [
-            {"Name": member["RegistryMembershipNonUser"]["alias"]["display_name"]}
+        member_names = [
+            member["RegistryMembershipNonUser"]["alias"]["display_name"]
             for member in registry["memberships"]
         ]
+        duplicate_names = sorted(name for name, count in Counter(member_names).items() if count > 1)
+        if duplicate_names:
+            duplicates = ", ".join(repr(name) for name in duplicate_names)
+            raise ValueError(
+                "Duplicate participant display names are not supported because exports "
+                f"use names as column identifiers: {duplicates}"
+            )
+        memberships = [{"Name": name} for name in member_names]
 
         transactions: list[dict[str, Any]] = []
         for entry in registry["all_registry_entry"]:
@@ -309,7 +318,7 @@ class TricountHandler:
                     "display_name"
                 ]
                 amount = allocation["amount"]
-                amount_local = allocation.get("amount_local", amount)
+                amount_local = allocation.get("amount_local") or amount
                 allocations[member_name] = {
                     "Amount": abs(float(amount["value"])),
                     "Currency": amount.get("currency", transaction["amount"]["currency"]),
@@ -322,7 +331,7 @@ class TricountHandler:
                 }
 
             amount = transaction["amount"]
-            amount_local = transaction.get("amount_local", amount)
+            amount_local = transaction.get("amount_local") or amount
 
             transactions.append(
                 {
@@ -336,7 +345,7 @@ class TricountHandler:
                     "Currency": amount["currency"],
                     "Local Total": float(amount_local["value"]) * -1,
                     "Local Currency": amount_local.get("currency", amount["currency"]),
-                    "Exchange Rate": transaction.get("exchange_rate", "1"),
+                    "Exchange Rate": transaction.get("exchange_rate") or "1",
                     "Description": transaction.get("description", ""),
                     "When": transaction["date"],
                     "Allocations": allocations,
@@ -830,6 +839,9 @@ def export_single_tricount(
     ):
         remove_path_if_exists(plan.export_dir / legacy_name)
 
+    if plan.attachments_dir is not None:
+        handler.download_attachments(plan.transactions, download_folder=plan.attachments_dir)
+
     handler.write_to_csv(plan.memberships, plan.transactions, file_path=plan.csv_path)
 
     if plan.excel_path is not None:
@@ -841,9 +853,6 @@ def export_single_tricount(
             plan.transactions,
             file_path=plan.sesterce_path,
         )
-
-    if plan.attachments_dir is not None:
-        handler.download_attachments(plan.transactions, download_folder=plan.attachments_dir)
 
     if plan.response_path is not None:
         plan.response_path.write_text(json.dumps(plan.raw_data, indent=2), encoding="utf-8")

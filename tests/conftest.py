@@ -153,8 +153,8 @@ def sample_rich_api_response(sample_api_response: dict) -> dict:
     ]
     transaction.update(
         {
-            "id": 123456789,
-            "uuid": "9c18864f-0e6d-413d-aad7-592d0b99d237",
+            "id": 1001,
+            "uuid": "11111111-2222-4333-8444-555555555555",
             "created": "2026-04-09 18:20:00.000000",
             "updated": "2026-04-09 18:31:00.000000",
             "status": "ACTIVE",
@@ -163,7 +163,7 @@ def sample_rich_api_response(sample_api_response: dict) -> dict:
             "amount_local": {"value": "-30.00", "currency": "GBP"},
             "exchange_rate": "1.2",
             "category": "OTHER",
-            "category_custom": "Brasserie 🍔",
+            "category_custom": "Dining 🍔",
         }
     )
     allocations = transaction["allocations"]

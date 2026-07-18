@@ -18,6 +18,10 @@ decisions.
 
 - [api-research.md](api-research.md): current findings about the Tricount API,
   including the live behavior observed during the rewrite
+- [allocation-data-research.md](allocation-data-research.md): allocation fields,
+  currency semantics, and the raw-JSON-to-export data flow
+- [sesterce-import-research.md](sesterce-import-research.md): official Sesterce
+  CSV schema, field mapping, and known verification limits
 
 ## Current Maintainer Workflow
 
