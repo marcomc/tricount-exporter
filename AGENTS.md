@@ -214,6 +214,9 @@ Minimum checks expected after code or doc changes:
 
 - `make check`
 
+Use each virtual environment's Python to invoke pip (`python -m pip`) rather
+than assuming a `bin/pip` script exists across supported Python versions.
+
 Current quality tooling:
 
 - Ruff for Python linting and formatting checks

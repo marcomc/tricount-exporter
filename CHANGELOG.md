@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.1] - 2026-07-19 - standalone installation fix
+
+### Fixed in 0.2.1
+
+- Fixed `make install` on Python distributions that provide `pip3` without a
+  `pip` script in virtual environments.
+- Fixed standalone installation paths containing spaces.
+- Removed a machine-specific absolute path from the API research notes.
+
 ## [0.2.0] - 2026-07-18 - richer allocation exports
 
 ### Added in 0.2.0

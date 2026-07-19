@@ -197,7 +197,7 @@ This means the current research state is:
 
 Current implementation file:
 
-- [/Users/mmassari/Development/tricount-exporter/src/tricount_exporter/cli.py](/Users/mmassari/Development/tricount-exporter/src/tricount_exporter/cli.py)
+- [`src/tricount_exporter/cli.py`](../src/tricount_exporter/cli.py)
 
 If future work revisits account-wide discovery:
 
