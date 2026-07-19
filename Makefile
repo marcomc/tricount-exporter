@@ -37,25 +37,25 @@ venv: ## Create the virtual environment
 	@if [[ ! -d "$(VENV)" ]]; then \
 		python3 -m venv "$(VENV)"; \
 	fi
-	$(VENV)/bin/python -m ensurepip --upgrade
-	$(PY) -m pip install --upgrade pip
+	"$(PY)" -m ensurepip --upgrade
+	"$(PY)" -m pip install --upgrade pip
 
 app-venv: ## Create the standalone runtime virtual environment
 	@mkdir -p "$(APP_HOME)"
 	@if [[ ! -d "$(APP_VENV)" ]]; then \
 		python3 -m venv "$(APP_VENV)"; \
 	fi
-	$(APP_VENV)/bin/python -m ensurepip --upgrade
-	$(APP_PY) -m pip install --upgrade pip
+	"$(APP_PY)" -m ensurepip --upgrade
+	"$(APP_PY)" -m pip install --upgrade pip
 
 install: check-deps app-venv ## Install the CLI in a standalone user venv
-	$(APP_PY) -m pip install setuptools wheel
-	$(APP_PY) -m pip install --no-build-isolation .
+	"$(APP_PY)" -m pip install setuptools wheel
+	"$(APP_PY)" -m pip install --no-build-isolation .
 	@$(MAKE) install-link install-config
 
 install-dev: check-deps venv ## Install repo-local dev dependencies
-	$(PY) -m pip install setuptools wheel
-	$(PY) -m pip install -e ".[dev]"
+	"$(PY)" -m pip install setuptools wheel
+	"$(PY)" -m pip install -e ".[dev]"
 	@$(MAKE) install-config
 
 install-link: ## Link the standalone runtime CLI into ~/.local/bin
@@ -80,14 +80,14 @@ uninstall: ## Remove the linked CLI and standalone runtime environment
 	@echo "Removed $(INSTALL_PATH)"
 
 lint: venv ## Run Python and Markdown checks
-	PYTHONPATH=src $(PY) -m ruff check src tests
-	PYTHONPATH=src $(PY) -m ruff format --check src tests
-	PYTHONPATH=src $(PY) -m mypy src
+	PYTHONPATH=src "$(PY)" -m ruff check src tests
+	PYTHONPATH=src "$(PY)" -m ruff format --check src tests
+	PYTHONPATH=src "$(PY)" -m mypy src
 	markdownlint --config .markdownlint.json $(MARKDOWN_FILES)
 	shellcheck --enable=all scripts/*.sh
 
 test: venv ## Run regression tests
-	PYTHONPATH=src $(PY) -m pytest -q
+	PYTHONPATH=src "$(PY)" -m pytest -q
 
 check: lint test ## Run the full maintainer quality gate
 
