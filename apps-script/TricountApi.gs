@@ -1,4 +1,4 @@
-function exportThreeCountShare_(share, message) {
+function exportThreeCountShare_(share, message, attachmentBudget) {
   const rawData = fetchThreeCountRegistry_(share.key);
   const registry = getThreeCountRegistry_(rawData);
   const title = String(registry.title || '').trim();
@@ -21,7 +21,9 @@ function exportThreeCountShare_(share, message) {
 
   let attachmentResult;
   try {
-    attachmentResult = downloadThreeCountAttachments_(registry, exportFolder);
+    attachmentResult = downloadThreeCountAttachments_(
+      registry, exportFolder, attachmentBudget
+    );
   } catch (error) {
     attachmentResult = {
       downloaded: 0,

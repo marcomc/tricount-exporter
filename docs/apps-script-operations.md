@@ -61,8 +61,9 @@ not undo an otherwise successful import.
 - A Tricount API failure leaves the pair unprocessed, so a later run retries it.
 - A receipt failure is written into `tricount-info.json`; the raw JSON remains
   available and the invitation is treated as exported.
-- The eligible-invitation target stops before starting another Gmail thread; the
-  attachment cap remains strict.
+- The eligible-invitation target stops before starting another Gmail thread.
+  The attachment cap is shared by every Tricount in the Gmail run and counts
+  failed fetch attempts.
 - Trigger reconciliation creates the replacement before deleting the old trigger
   and requires exactly one valid 12-hour handler.
 

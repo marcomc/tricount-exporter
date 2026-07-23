@@ -57,19 +57,35 @@ function findThreeCountFileByName_(folder, name) {
   return files.hasNext() ? files.next() : null;
 }
 
-function downloadThreeCountAttachments_(registry, exportFolder) {
+function downloadThreeCountAttachments_(registry, exportFolder, attachmentBudget) {
+  if (!attachmentBudget ||
+    !Number.isInteger(attachmentBudget.remaining) ||
+    attachmentBudget.remaining < 0) {
+    throw new Error('Attachment download budget is invalid.');
+  }
   const downloads = collectThreeCountAttachmentDownloads_(registry);
   const result = { downloaded: 0, failures: [] };
   if (!downloads.length) {
     return result;
   }
-  const maxAttachments = getThreeCountConfig_().max_attachments_per_run;
+  const attemptedDownloads = Math.min(
+    downloads.length, attachmentBudget.remaining
+  );
+  if (!attemptedDownloads) {
+    result.failures.push({
+      name: '',
+      error: 'Attachment run limit reached; skipped ' +
+        downloads.length + ' attachment(s).'
+    });
+    return result;
+  }
   const attachmentFolder = getOrCreateThreeCountChildFolder_(
     exportFolder,
     'Attachments ' + sanitizeThreeCountPathComponent_(String(registry.title || 'tricount'))
   );
   clearThreeCountFolder_(attachmentFolder);
-  downloads.slice(0, maxAttachments).forEach(function (download) {
+  downloads.slice(0, attemptedDownloads).forEach(function (download) {
+    attachmentBudget.remaining -= 1;
     try {
       const response = UrlFetchApp.fetch(download.url, { muteHttpExceptions: true });
       if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
@@ -81,9 +97,11 @@ function downloadThreeCountAttachments_(registry, exportFolder) {
       result.failures.push({ name: download.name, error: String(error.message || error) });
     }
   });
-  if (downloads.length > maxAttachments) {
+  if (downloads.length > attemptedDownloads) {
     result.failures.push({
-      name: '', error: 'Attachment limit reached: ' + maxAttachments + ' of ' + downloads.length
+      name: '',
+      error: 'Attachment run limit reached; attempted ' +
+        attemptedDownloads + ' of ' + downloads.length + '.'
     });
   }
   return result;

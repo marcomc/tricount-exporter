@@ -89,7 +89,13 @@ exportSandbox.sanitizeThreeCountFileComponent_ = () => 'example-trip';
 exportSandbox.writeThreeCountJsonFile_ = (_folder, name, data) => {
   exportWrites.push({ name, data: JSON.parse(JSON.stringify(data)) });
 };
-exportSandbox.downloadThreeCountAttachments_ = () => {
+const exportAttachmentBudget = { remaining: 5 };
+exportSandbox.downloadThreeCountAttachments_ = (
+  _registry,
+  _folder,
+  attachmentBudget
+) => {
+  assert.equal(attachmentBudget, exportAttachmentBudget);
   assert.deepEqual(
     exportWrites.map((write) => write.name),
     ['transactions-example-trip.json', 'tricount-info.json']
@@ -98,7 +104,8 @@ exportSandbox.downloadThreeCountAttachments_ = () => {
 };
 const exportedAfterAttachmentFailure = exportSandbox.exportThreeCountShare_(
   { key: 'EXAMPLE_SHARE_KEY', sourceUrl: 'https://tricount.com/EXAMPLE_SHARE_KEY' },
-  { getId: () => 'example-message-id', getDate: () => new Date('2026-07-23T00:00:00.000Z') }
+  { getId: () => 'example-message-id', getDate: () => new Date('2026-07-23T00:00:00.000Z') },
+  exportAttachmentBudget
 );
 assert.equal(exportedAfterAttachmentFailure.attachmentCount, 0);
 assert.equal(exportedAfterAttachmentFailure.attachmentFailures, 1);
@@ -111,6 +118,68 @@ assert.deepEqual(exportWrites[2].data.attachment_result, {
   downloaded: 0,
   failures: [{ name: '', error: 'attachment timeout' }]
 });
+
+let attachmentFetchAttempts = 0;
+let attachmentFolderResolutions = 0;
+let attachmentFolderClears = 0;
+const attachmentSandbox = vm.createContext({
+  UrlFetchApp: {
+    fetch: () => {
+      attachmentFetchAttempts += 1;
+      throw new Error('attachment fetch failed');
+    },
+  },
+});
+vm.runInContext(drive, attachmentSandbox);
+attachmentSandbox.getOrCreateThreeCountChildFolder_ = () => {
+  attachmentFolderResolutions += 1;
+  return {};
+};
+attachmentSandbox.clearThreeCountFolder_ = () => {
+  attachmentFolderClears += 1;
+};
+const runAttachmentBudget = { remaining: 1 };
+const firstShareAttachmentResult =
+  attachmentSandbox.downloadThreeCountAttachments_(
+    {
+      title: 'First share',
+      all_registry_entry: [{
+        RegistryEntry: {
+          attachment: [{
+            urls: [{ url: 'https://example.test/first.jpg' }],
+          }],
+        },
+      }],
+    },
+    {},
+    runAttachmentBudget
+  );
+const secondShareAttachmentResult =
+  attachmentSandbox.downloadThreeCountAttachments_(
+    {
+      title: 'Second share',
+      all_registry_entry: [{
+        RegistryEntry: {
+          attachment: [{
+            urls: [{ url: 'https://example.test/second.jpg' }],
+          }],
+        },
+      }],
+    },
+    {},
+    runAttachmentBudget
+  );
+assert.equal(runAttachmentBudget.remaining, 0);
+assert.equal(attachmentFetchAttempts, 1);
+assert.equal(firstShareAttachmentResult.downloaded, 0);
+assert.equal(firstShareAttachmentResult.failures.length, 1);
+assert.equal(secondShareAttachmentResult.downloaded, 0);
+assert.match(
+  secondShareAttachmentResult.failures[0].error,
+  /Attachment run limit reached/
+);
+assert.equal(attachmentFolderResolutions, 1);
+assert.equal(attachmentFolderClears, 1);
 
 function createThreeCountImportLogFile(name, content) {
   return {

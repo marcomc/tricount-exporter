@@ -51,6 +51,7 @@ function createScenario({
   exportError = null,
   failingKey = '',
   messages = [createMessage()],
+  maxAttachments = 100,
   maxMessages = 100,
   threadCount = 1,
   threadMessages = null,
@@ -62,6 +63,8 @@ function createScenario({
     notifications: 0,
     saved: null,
     searchCalls: [],
+    attachmentBudgets: [],
+    attachmentRemainingBefore: [],
   };
   const inbox = [];
   const scenarioThreadCount = threadMessages ? threadMessages.length : threadCount;
@@ -108,15 +111,21 @@ function createScenario({
     getThreeCountConfig_: () => ({
       lookback_days: 30,
       gmail_query: 'in:inbox subject:tricount',
+      max_attachments_per_run: maxAttachments,
       max_messages_per_run: maxMessages,
       archive_processed_threads: true,
     }),
     getProcessedThreeCountRecords_: () => ({ ...normalizedProcessed }),
     getOrCreateThreeCountProcessedLabel_: () => 'processed-label',
     shortThreeCountKey_: (key) => String(key).slice(-6),
-    exportThreeCountShare_: (share) => {
+    exportThreeCountShare_: (share, _message, attachmentBudget) => {
       if (exportError && (!failingKey || share.key === failingKey)) {
         throw exportError;
+      }
+      effects.attachmentBudgets.push(attachmentBudget);
+      effects.attachmentRemainingBefore.push(attachmentBudget.remaining);
+      if (attachmentBudget.remaining > 0) {
+        attachmentBudget.remaining -= 1;
       }
       return {
         title: 'Example',
@@ -265,6 +274,26 @@ assert.ok(ineligibleBeforeEligible.effects.saved[
     'LATER_ELIGIBLE:LATER_ELIGIBLE_KEY'
   )
 ]);
+
+const sharedAttachmentBudget = createScenario({
+  maxAttachments: 1,
+  messages: [createMessage({
+    body: [
+      'Join: https://tricount.com/FIRST_ATTACHMENT_SHARE',
+      'https://tricount.com/SECOND_ATTACHMENT_SHARE',
+    ].join(' '),
+  })],
+});
+const sharedAttachmentSummary = sharedAttachmentBudget.run();
+assert.equal(sharedAttachmentSummary.exported.length, 2);
+assert.deepEqual(
+  sharedAttachmentBudget.effects.attachmentRemainingBefore,
+  [1, 0]
+);
+assert.equal(
+  sharedAttachmentBudget.effects.attachmentBudgets[0],
+  sharedAttachmentBudget.effects.attachmentBudgets[1]
+);
 
 function createPropertyStore(initial = {}) {
   const values = { ...initial };

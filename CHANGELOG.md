@@ -35,6 +35,8 @@ All notable changes to this project are documented in this file.
   migration-compatible Script Properties shards.
 - Fixed attachment download failures preventing the fetched registry JSON and
   initial metadata from reaching Drive.
+- Enforced the attachment-attempt cap across every Tricount in one Gmail run,
+  including failed fetch attempts.
 - Prevented the audit log from overwriting an unrelated same-named CSV in the
   selected Drive output root.
 - Made the Make targets portable across macOS and Linux CI runners by using

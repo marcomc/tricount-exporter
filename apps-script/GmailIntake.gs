@@ -13,6 +13,7 @@ function runThreeCountExporter_() {
   const cutoff = new Date(Date.now() - config.lookback_days * 24 * 60 * 60 * 1000);
   const pageSize = Math.min(100, config.max_messages_per_run);
   const seenThreadIds = {};
+  const attachmentBudget = { remaining: config.max_attachments_per_run };
 
   while (summary.eligibleMessages < config.max_messages_per_run) {
     const threads = findUnseenThreeCountThreads_(
@@ -53,7 +54,9 @@ function runThreeCountExporter_() {
             continue;
           }
           try {
-            const exported = exportThreeCountShare_(share, message);
+            const exported = exportThreeCountShare_(
+              share, message, attachmentBudget
+            );
             const notificationStatus = sendThreeCountSuccessNotification_(message, share, exported, config);
             appendThreeCountImportLog_({
               status: 'success', message: message, share: share, exported: exported,

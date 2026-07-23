@@ -20,7 +20,7 @@ The installer creates the ignored `config.apps-script.local.json` from
 | `gmail_query` | Bounded Gmail search query. |
 | `lookback_days` | Maximum invitation age to scan. |
 | `max_messages_per_run` | Eligible-invitation target; threads finish atomically. |
-| `max_attachments_per_run` | Hard cap for downloaded receipt files. |
+| `max_attachments_per_run` | Hard per-run cap on receipt fetch attempts, including failures. |
 | `drive_folder_name` | Private Drive root title. |
 | `drive_output_folder_url` | Optional Drive folder URL used instead of the default root. |
 | `processed_label_name` | Gmail label applied after a successful import. |
