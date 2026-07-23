@@ -61,10 +61,13 @@ For end users:
 
 - macOS or Linux
 - Python 3.11+
+- Bash
 - `make`
 
 For contributors:
 
+- Node.js for Apps Script validation
+- `jq` for the Apps Script installer preflight test
 - `markdownlint` for Markdown validation
 - `mypy` through the project virtual environment
 - `shellcheck` for shell script validation
@@ -89,8 +92,8 @@ make install
 - installs a default config template to
   `~/.config/tricount-exporter/config.toml` if one does not exist yet
 
-If `~/.local/bin` is not on your `PATH`, `make check-deps` tells you what to
-add to your shell profile.
+If `~/.local/bin` is not on your `PATH`, `make check-runtime-deps` tells you
+what to add to your shell profile.
 
 This means the installed `tricount-exporter` command keeps working even if you
 later delete or move the source checkout.
@@ -367,6 +370,8 @@ make install-dev
 
 `make install-dev` is for working on the repository itself. It uses the local
 `.venv` and does not define the user-facing installed command.
+
+Run `make check-deps` to verify the contributor tools before the full gate.
 
 Run the full maintainer quality gate:
 
