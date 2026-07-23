@@ -2,13 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
-## [0.3.0.] - 2026-07-23 - `Tricount-Exporter` Google Apps Script automation
+## [0.3.0] - 2026-07-23 - `Tricount-Exporter` Google Apps Script automation
 
 ### Added
 
 - Optional standalone `Tricount-Exporter` Google Apps Script automation.
 - Gmail invitation discovery, cloud-only Tricount JSON export, receipt download,
-  idempotent Drive output, daily trigger lifecycle, and a resumable installer.
+  idempotent Drive output, time-based trigger lifecycle, and a resumable installer.
 - Added a configurable Gmail import-status label, applied after successful
   imports without changing the email read state.
 - Added an append-only CSV import audit with source Gmail and Tricount URLs,
@@ -25,10 +25,15 @@ All notable changes to this project are documented in this file.
   `URL` global, including direct Tricount share links in real Gmail messages.
 - Fixed processed-thread archiving to preserve an invitation's existing unread
   state.
+- Fixed mixed-outcome Gmail threads being labeled or archived before every
+  detected share URL was processed successfully.
+- Removed an unused Google Cloud Platform OAuth scope from the Apps Script
+  manifest.
 
 ## [0.2.1] - 2026-07-19 - standalone installation fix
 
 ### Fixed
+
 - Fixed `make install` on Python distributions that provide `pip3` without a
   `pip` script in virtual environments.
 - Fixed standalone installation paths containing spaces.

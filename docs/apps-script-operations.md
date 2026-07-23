@@ -16,9 +16,11 @@ Tricount registry, then writes raw JSON and attachments to Drive.
 
 An already processed `(Gmail message ID, public share key)` pair is skipped.
 The durable processed-record list retains the newest 1,000 records.
-The corresponding Gmail thread receives the configured processed label, but the
-script never marks it as read. With the default configuration it is then
-archived, so it leaves Inbox and remains available through the processed label.
+The corresponding Gmail thread receives the configured processed label only
+when every detected Tricount URL in that thread was exported or already known.
+The script preserves every message's existing read state. With the default
+configuration it then archives the thread, so it leaves Inbox and remains
+available through the processed label.
 
 ## Manual run
 
@@ -64,3 +66,7 @@ the broad Gmail scope. It processes only the configured account, saves no email
 body, trusts no URL outside the exact Tricount domain boundary, and writes only
 to its dedicated Drive root. Public share URLs grant data access; keep the Drive
 folder private and revoke a share link in Tricount if it was sent in error.
+
+The manifest requests only the Gmail, Drive, outbound-request, mail-send, and
+trigger-management scopes used by the automation. It does not request the
+Google Cloud Platform scope.

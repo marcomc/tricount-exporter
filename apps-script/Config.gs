@@ -1,5 +1,5 @@
 const THREE_COUNT_CONFIG = Object.freeze({
-  APP_VERSION: '0.1.0',
+  APP_VERSION: '0.3.0',
   API_BASE_URL: 'https://api.tricount.bunq.com',
   DAILY_HANDLER: 'runDailyThreeCountExporter',
   MAX_RUNTIME_MS: 280000,

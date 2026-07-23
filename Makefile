@@ -92,6 +92,7 @@ test: venv ## Run regression tests
 	PYTHONPATH=src "$(PY)" -m pytest -q
 	node scripts/validate-apps-script.js
 	node tests/apps_script_contract_test.js
+	node tests/apps_script_gmail_intake_test.js
 	bash tests/apps_script_installer_test.sh
 
 check: lint test ## Run the full maintainer quality gate
@@ -105,7 +106,7 @@ apps-script-install: ## Provision the standalone Tricount-Exporter Apps Script
 apps-script-status: ## Read the installed Apps Script status without mutation
 	./scripts/install-google-apps-script.sh --status
 
-apps-script-uninstall: ## Remove this Apps Script's managed daily trigger
+apps-script-uninstall: ## Remove this Apps Script's managed time-based trigger
 	./scripts/install-google-apps-script.sh --uninstall
 
 run: install ## Show CLI help

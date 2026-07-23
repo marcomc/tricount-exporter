@@ -15,7 +15,10 @@ function runThreeCountExporter_() {
     }
     offset += threads.length;
     for (let threadIndex = 0; threadIndex < threads.length; threadIndex += 1) {
-      const messages = threads[threadIndex].getMessages();
+      const thread = threads[threadIndex];
+      const messages = thread.getMessages();
+      let shouldFinalizeThread = false;
+      let threadHasFailure = false;
       for (let messageIndex = 0; messageIndex < messages.length; messageIndex += 1) {
         if (summary.scannedMessages >= config.max_messages_per_run) {
           break;
@@ -31,13 +34,8 @@ function runThreeCountExporter_() {
           summary.discoveredUrls += 1;
           const recordId = message.getId() + ':' + share.key;
           if (processed[recordId]) {
-            try {
-              threads[threadIndex].addLabel(processedLabel);
-              archiveThreeCountProcessedThread_(threads[threadIndex], message, config);
-              summary.skipped.push({ messageId: message.getId(), keySuffix: shortThreeCountKey_(share.key) });
-            } catch (error) {
-              summary.errors.push({ keySuffix: shortThreeCountKey_(share.key), error: String(error.message || error) });
-            }
+            shouldFinalizeThread = true;
+            summary.skipped.push({ messageId: message.getId(), keySuffix: shortThreeCountKey_(share.key) });
             continue;
           }
           try {
@@ -47,9 +45,8 @@ function runThreeCountExporter_() {
               status: 'success', message: message, share: share, exported: exported,
               notificationStatus: notificationStatus
             });
-            threads[threadIndex].addLabel(processedLabel);
             processed[recordId] = new Date().toISOString();
-            archiveThreeCountProcessedThread_(threads[threadIndex], message, config);
+            shouldFinalizeThread = true;
             summary.exported.push(exported);
           } catch (error) {
             const errorMessage = String(error.message || error);
@@ -62,10 +59,23 @@ function runThreeCountExporter_() {
                 keySuffix: shortThreeCountKey_(share.key),
                 error: errorMessage + ' Audit log failure: ' + String(logError.message || logError)
               });
+              threadHasFailure = true;
               continue;
             }
+            threadHasFailure = true;
             summary.errors.push({ keySuffix: shortThreeCountKey_(share.key), error: errorMessage });
           }
+        }
+      }
+      if (shouldFinalizeThread && !threadHasFailure) {
+        try {
+          thread.addLabel(processedLabel);
+          archiveThreeCountProcessedThread_(thread, config);
+        } catch (error) {
+          summary.errors.push({
+            threadId: thread.getId(),
+            error: 'Could not finalize processed Gmail thread: ' + String(error.message || error)
+          });
         }
       }
     }
@@ -82,13 +92,13 @@ function runThreeCountExporter_() {
   return summary;
 }
 
-function archiveThreeCountProcessedThread_(thread, message, config) {
+function archiveThreeCountProcessedThread_(thread, config) {
   if (config.archive_processed_threads) {
-    const wasUnread = message.isUnread();
+    const unreadMessages = thread.getMessages().filter(function (threadMessage) {
+      return threadMessage.isUnread();
+    });
     thread.moveToArchive();
-    if (wasUnread) {
-      message.markUnread();
-    }
+    unreadMessages.forEach(function (threadMessage) { threadMessage.markUnread(); });
   }
 }
 

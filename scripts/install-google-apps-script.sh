@@ -66,13 +66,14 @@ ensure_config() {
   fi
   jq -e '
     (.time_zone | type == "string" and length > 0) and
-    (.run_interval_hours | type == "number" and . >= 1 and . <= 23) and
+    (.run_interval_hours | type == "number" and floor == . and . >= 1 and . <= 23) and
     (.gmail_query | type == "string" and length > 0) and
-    (.lookback_days | type == "number" and . >= 1) and
-    (.max_messages_per_run | type == "number" and . >= 1 and . <= 500) and
-    (.max_attachments_per_run | type == "number" and . >= 1 and . <= 500) and
+    (.lookback_days | type == "number" and floor == . and . >= 1) and
+    (.max_messages_per_run | type == "number" and floor == . and . >= 1 and . <= 500) and
+    (.max_attachments_per_run | type == "number" and floor == . and . >= 1 and . <= 500) and
     (.drive_folder_name | type == "string" and length > 0) and
-    (.drive_output_folder_url | type == "string") and
+    (.drive_output_folder_url | type == "string" and
+      (length == 0 or test("^https://drive\\.google\\.com/drive/(?:u/[0-9]+/)?folders/[A-Za-z0-9_-]+(?:[/?#].*)?$"))) and
     (.processed_label_name | type == "string" and length > 0) and
     (.archive_processed_threads | type == "boolean") and
     (.notification_email | type == "string") and
@@ -234,6 +235,21 @@ ensure_owner_authorization() {
     <<<"${authorization}" >/dev/null || die 'Private owner authorization did not complete.'
 }
 
+require_owner_authorization() {
+  local authorization authorization_status
+  [[ -f "${AUTH_FILE}" ]] || die \
+    'Private owner authorization is missing. Run make apps-script-install to authorize again.'
+  set +e
+  authorization="$(clasp --json show-authorized-user 2>/dev/null)"
+  authorization_status=$?
+  set -e
+  if [[ "${authorization_status}" -ne 0 ]] || ! jq -e \
+    '.loggedIn == true and (.email | type == "string" and length > 0)' \
+    <<<"${authorization}" >/dev/null; then
+    die 'Private owner authorization is stale. Run make apps-script-install to authorize again.'
+  fi
+}
+
 install_check() {
   require_command jq
   require_command node
@@ -356,20 +372,18 @@ bootstrap_script() {
 
 show_status() {
   [[ -f "${CLASP_FILE}" ]] || die 'No installed Apps Script mapping exists. Run make apps-script-install first.'
-  [[ -f "${SOURCE_DIR}/.clasp.json" ]] || cp "${CLASP_FILE}" "${SOURCE_DIR}/.clasp.json"
   (
-    cd "${SOURCE_DIR}"
+    cd "${STATE_DIR}"
     clasp --json run validateThreeCountExporterInstallation
   )
 }
 
 uninstall() {
   [[ "${TRICOUNT_EXPORTER_CONFIRM_UNINSTALL:-}" == 'DELETE' ]] || die \
-    'Set TRICOUNT_EXPORTER_CONFIRM_UNINSTALL=DELETE to remove the managed trigger and Drive export folder.'
+    'Set TRICOUNT_EXPORTER_CONFIRM_UNINSTALL=DELETE to remove the managed trigger.'
   [[ -f "${CLASP_FILE}" ]] || die 'No installed Apps Script mapping exists.'
-  [[ -f "${SOURCE_DIR}/.clasp.json" ]] || cp "${CLASP_FILE}" "${SOURCE_DIR}/.clasp.json"
   (
-    cd "${SOURCE_DIR}"
+    cd "${STATE_DIR}"
     clasp --json run removeThreeCountAutomationTrigger >/dev/null
   )
   info 'Managed daily trigger removed. The Apps Script project and Drive exports were preserved.'
@@ -384,7 +398,7 @@ main() {
     status)
       install_check
       ensure_state_dir
-      ensure_owner_authorization
+      require_owner_authorization
       show_status
       return
       ;;

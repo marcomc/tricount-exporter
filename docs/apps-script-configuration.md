@@ -15,7 +15,7 @@ The installer creates the ignored `config.apps-script.local.json` from
 
 | Key | Purpose |
 | --- | --- |
-| `time_zone` | IANA timezone for the daily trigger. |
+| `time_zone` | IANA timezone for the time-based trigger. |
 | `run_interval_hours` | Trigger interval in hours; default `12`. |
 | `gmail_query` | Bounded Gmail search query. |
 | `lookback_days` | Maximum invitation age to scan. |
@@ -85,10 +85,10 @@ permission to create folders and files in the selected Drive folder.
 ```text
 Tricount-Exporter/
   tricount-exporter-import-log.csv
-  HoStello-202607/
-    transactions-hostello-202607.json
+  Example-trip/
+    transactions-example-trip.json
     tricount-info.json
-    Attachments HoStello-202607/
+    Attachments Example-trip/
       receipt_1.jpg
 ```
 

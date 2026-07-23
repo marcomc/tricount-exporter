@@ -7,16 +7,20 @@ function sendThreeCountSuccessNotification_(message, share, exported, config) {
     return 'not-sent:no-recipient';
   }
   try {
+    const title = normalizeThreeCountNotificationText_(exported.title);
+    const folderUrl = normalizeThreeCountNotificationText_(exported.folderUrl);
+    const sourceUrl = normalizeThreeCountNotificationText_(share.sourceUrl);
+    const messageUrl = normalizeThreeCountNotificationText_(getThreeCountGmailMessageUrl_(message));
     MailApp.sendEmail({
       to: recipient,
-      subject: '[Tricount-Exporter] Imported: ' + exported.title,
+      subject: '[Tricount-Exporter] Imported: ' + title,
       body: [
         'Tricount imported successfully.',
         '',
-        'Title: ' + exported.title,
-        'Export folder: ' + exported.folderUrl,
-        'Tricount URL: ' + share.sourceUrl,
-        'Source Gmail message: ' + getThreeCountGmailMessageUrl_(message),
+        'Title: ' + title,
+        'Export folder: ' + folderUrl,
+        'Tricount URL: ' + sourceUrl,
+        'Source Gmail message: ' + messageUrl,
         'Attachments downloaded: ' + exported.attachmentCount,
         'Attachment failures: ' + exported.attachmentFailures
       ].join('\n')
@@ -26,4 +30,9 @@ function sendThreeCountSuccessNotification_(message, share, exported, config) {
     console.warn('Tricount success notification failed: ' + String(error.message || error));
     return 'not-sent:' + String(error.message || error);
   }
+}
+
+function normalizeThreeCountNotificationText_(value) {
+  return String(value === undefined || value === null ? '' : value)
+    .replace(/[\u0000-\u001F\u007F]/g, ' ').trim();
 }

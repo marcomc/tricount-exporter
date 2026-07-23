@@ -46,17 +46,17 @@ assert.match(api, /attachment_result/);
 assert.match(automation, /runDailyThreeCountExporter/);
 assert.match(automation, /everyHours\(config\.run_interval_hours\)/);
 assert.match(automation, /LockService\.getScriptLock\(\)/);
-assert.match(gmailIntake, /threads\[threadIndex\]\.addLabel\(processedLabel\)/);
+assert.match(gmailIntake, /thread\.addLabel\(processedLabel\)/);
 assert.match(gmailIntake, /thread\.moveToArchive\(\)/);
-assert.match(gmailIntake, /const wasUnread = message\.isUnread\(\)/);
-assert.match(gmailIntake, /message\.markUnread\(\)/);
+assert.match(gmailIntake, /const unreadMessages = thread\.getMessages\(\)\.filter/);
+assert.match(gmailIntake, /threadMessage\.markUnread\(\)/);
 assert.match(gmailIntake, /GmailApp\.createLabel\(name\)/);
 assert.doesNotMatch(gmailIntake, /markRead\(/);
 assert.match(notifications, /MailApp\.sendEmail/);
 assert.deepEqual(manifest.executionApi, { access: 'MYSELF' });
 assert.ok(manifest.oauthScopes.includes('https://mail.google.com/'));
 assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/drive'));
-assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/cloud-platform'));
+assert.ok(!manifest.oauthScopes.includes('https://www.googleapis.com/auth/cloud-platform'));
 assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/script.send_mail'));
 
 const appsScriptSandbox = vm.createContext({
@@ -66,25 +66,57 @@ const appsScriptSandbox = vm.createContext({
 vm.runInContext(gmailIntake, appsScriptSandbox);
 assert.deepEqual(
   JSON.parse(JSON.stringify(appsScriptSandbox.normalizeThreeCountShareUrl_(
-    'https://tricount.com/tfMjRIbpOmaoxdtCtd'
+    'https://tricount.com/EXAMPLE_SHARE_KEY'
   ))),
   {
-    key: 'tfMjRIbpOmaoxdtCtd',
-    sourceUrl: 'https://tricount.com/tfMjRIbpOmaoxdtCtd',
+    key: 'EXAMPLE_SHARE_KEY',
+    sourceUrl: 'https://tricount.com/EXAMPLE_SHARE_KEY',
   }
 );
 assert.equal(
-  appsScriptSandbox.normalizeThreeCountShareUrl_('https://nottricount.com/tfMjRIbpOmaoxdtCtd'),
+  appsScriptSandbox.normalizeThreeCountShareUrl_('https://nottricount.com/EXAMPLE_SHARE_KEY'),
   null
 );
+
+const unreadMessages = [
+  { isUnread: () => true, markUnread: () => { unreadMessages[0].restored = true; } },
+  { isUnread: () => false, markUnread: () => { unreadMessages[1].restored = true; } },
+  { isUnread: () => true, markUnread: () => { unreadMessages[2].restored = true; } },
+];
+const archiveThread = {
+  getMessages: () => unreadMessages,
+  moveToArchive: () => { archiveThread.archived = true; },
+};
+appsScriptSandbox.archiveThreeCountProcessedThread_(archiveThread, { archive_processed_threads: true });
+assert.equal(archiveThread.archived, true);
+assert.equal(unreadMessages[0].restored, true);
+assert.equal(unreadMessages[1].restored, undefined);
+assert.equal(unreadMessages[2].restored, true);
+
+const sentNotifications = [];
+const notificationSandbox = vm.createContext({
+  MailApp: { sendEmail: (message) => { sentNotifications.push(message); } },
+  Session: { getEffectiveUser: () => ({ getEmail: () => 'owner@example.test' }) },
+  console: { warn: () => {} },
+  getThreeCountGmailMessageUrl_: () => 'https://mail.google.com/example',
+});
+vm.runInContext(notifications, notificationSandbox);
+assert.equal(notificationSandbox.sendThreeCountSuccessNotification_(
+  {},
+  { sourceUrl: 'https://tricount.com/EXAMPLE_SHARE_KEY' },
+  { title: 'Example\nBcc: injected@example.test', folderUrl: 'https://drive.google.com/example', attachmentCount: 0, attachmentFailures: 0 },
+  { send_success_notification: true, notification_email: '' }
+), 'sent');
+assert.doesNotMatch(sentNotifications[0].subject, /[\r\n]/);
+assert.doesNotMatch(sentNotifications[0].body, /[\r\n](Bcc|Cc|To):/);
 
 const installerSandbox = vm.createContext({});
 vm.runInContext(installer, installerSandbox);
 assert.equal(
   installerSandbox.extractThreeCountDriveFolderId_(
-    'https://drive.google.com/drive/folders/11vrL7GscWwahSFm4X3HTSQuF0GikrE1E?usp=share_link'
+    'https://drive.google.com/drive/folders/EXAMPLE_FOLDER_ID?usp=share_link'
   ),
-  '11vrL7GscWwahSFm4X3HTSQuF0GikrE1E'
+  'EXAMPLE_FOLDER_ID'
 );
 assert.throws(
   () => installerSandbox.extractThreeCountDriveFolderId_('https://example.com/folder'),
