@@ -37,6 +37,8 @@ All notable changes to this project are documented in this file.
   initial metadata from reaching Drive.
 - Prevented the audit log from overwriting an unrelated same-named CSV in the
   selected Drive output root.
+- Made the Make targets portable across macOS and Linux CI runners by using
+  Bash-compatible shell constructs.
 
 ## [0.2.1] - 2026-07-19 - standalone installation fix
 

@@ -1,4 +1,4 @@
-SHELL := /bin/zsh
+SHELL := /bin/bash
 VENV := .venv
 PY := $(VENV)/bin/python
 MARKDOWN_FILES := README.md CHANGELOG.md TODO.md AGENTS.md docs/*.md
@@ -27,7 +27,7 @@ check-deps: ## Verify required system prerequisites
 	@python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" \
 		|| { echo "Python 3.11+ required (found $$(python3 --version 2>&1))"; exit 1; }
 	@mkdir -p "$(BINDIR)" "$(CONFIG_DIR)"
-	@if print -r -- "$$PATH" | tr ':' '\n' | grep -Fx "$(BINDIR)" >/dev/null; then \
+	@if printf '%s\n' "$$PATH" | tr ':' '\n' | grep -Fx "$(BINDIR)" >/dev/null; then \
 		echo "$(BINDIR) is on PATH"; \
 	else \
 		echo "$(BINDIR) is not on PATH"; \
@@ -113,4 +113,4 @@ run: install ## Show CLI help
 	"$(INSTALL_PATH)" --help
 
 clean: ## Remove local build and virtualenv artifacts
-	rm -rf $(VENV) .mypy_cache .ruff_cache build dist src/*.egg-info(N) *.egg-info(N)
+	rm -rf $(VENV) .mypy_cache .ruff_cache build dist src/*.egg-info *.egg-info
