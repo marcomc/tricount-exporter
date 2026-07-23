@@ -6,18 +6,31 @@ function exportThreeCountShare_(share, message) {
     throw new Error('The Tricount registry has no title.');
   }
   const exportFolder = resolveThreeCountExportFolder_(title, share.key);
-  const attachmentResult = downloadThreeCountAttachments_(registry, exportFolder);
   const fileStem = sanitizeThreeCountFileComponent_(title);
   writeThreeCountJsonFile_(exportFolder, 'transactions-' + fileStem + '.json', rawData);
-  writeThreeCountJsonFile_(exportFolder, 'tricount-info.json', {
+  const metadata = {
     title: title,
     tricount_key: share.key,
     source_url: share.sourceUrl,
     gmail_message_id: message.getId(),
     received_at: message.getDate().toISOString(),
     downloaded_at: new Date().toISOString(),
-    attachment_result: attachmentResult
-  });
+    attachment_result: { downloaded: 0, failures: [] }
+  };
+  writeThreeCountJsonFile_(exportFolder, 'tricount-info.json', metadata);
+
+  let attachmentResult;
+  try {
+    attachmentResult = downloadThreeCountAttachments_(registry, exportFolder);
+  } catch (error) {
+    attachmentResult = {
+      downloaded: 0,
+      failures: [{ name: '', error: String(error.message || error) }]
+    };
+    console.warn('Tricount attachment download failed: ' + attachmentResult.failures[0].error);
+  }
+  metadata.attachment_result = attachmentResult;
+  writeThreeCountJsonFile_(exportFolder, 'tricount-info.json', metadata);
   return {
     title: title,
     folderUrl: exportFolder.getUrl(),

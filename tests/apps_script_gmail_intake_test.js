@@ -32,11 +32,12 @@ function createUtilities() {
 
 function createMessage({
   body = 'Join: https://tricount.com/EXAMPLE_SHARE_KEY',
+  date = new Date(),
   id = 'EXAMPLE_MESSAGE_ID',
   subject = "Hey, I've added you to my tricount",
 } = {}) {
   return {
-    getDate: () => new Date(),
+    getDate: () => date,
     getSubject: () => subject,
     getPlainBody: () => body,
     getId: () => id,
@@ -52,6 +53,7 @@ function createScenario({
   messages = [createMessage()],
   maxMessages = 100,
   threadCount = 1,
+  threadMessages = null,
 } = {}) {
   const effects = {
     archived: 0,
@@ -62,17 +64,19 @@ function createScenario({
     searchCalls: [],
   };
   const inbox = [];
-  for (let index = 0; index < threadCount; index += 1) {
-    const threadMessages = threadCount === 1 ? messages : [
+  const scenarioThreadCount = threadMessages ? threadMessages.length : threadCount;
+  for (let index = 0; index < scenarioThreadCount; index += 1) {
+    const messagesForThread = threadMessages ? threadMessages[index] :
+      threadCount === 1 ? messages : [
       createMessage({
         body: `Join: https://tricount.com/SHARE_KEY_${index}`,
         id: `MESSAGE_${index}`,
       }),
-    ];
+      ];
     const thread = {
       addLabel: () => { effects.labels += 1; },
       getId: () => `THREAD_${index}`,
-      getMessages: () => threadMessages,
+      getMessages: () => messagesForThread,
       moveToArchive: () => {
         effects.archived += 1;
         const inboxIndex = inbox.indexOf(thread);
@@ -228,6 +232,39 @@ assert.equal(paginated.effects.labels, 150);
 assert.ok(paginated.effects.searchCalls.length >= 2);
 assert.equal(paginated.effects.searchCalls[0].offset, 0);
 assert.equal(paginated.effects.searchCalls[1].offset, 0);
+
+const ineligibleBeforeEligible = createScenario({
+  maxMessages: 1,
+  threadMessages: [
+    [createMessage({
+      id: 'WRONG_SUBJECT',
+      subject: 'An unrelated inbox message',
+    })],
+    [createMessage({
+      date: new Date('2020-01-01T00:00:00.000Z'),
+      id: 'TOO_OLD',
+    })],
+    [createMessage({
+      body: 'Join: https://example.com/NOT_A_TRICOUNT_KEY',
+      id: 'NO_VALID_SHARE_URL',
+    })],
+    [createMessage({
+      body: 'Join: https://tricount.com/LATER_ELIGIBLE_KEY',
+      id: 'LATER_ELIGIBLE',
+    })],
+  ],
+});
+const ineligibleSummary = ineligibleBeforeEligible.run();
+assert.equal(ineligibleSummary.scannedMessages, 4);
+assert.equal(ineligibleSummary.eligibleMessages, 1);
+assert.equal(ineligibleSummary.exported.length, 1);
+assert.equal(ineligibleBeforeEligible.effects.labels, 1);
+assert.equal(ineligibleBeforeEligible.effects.archived, 1);
+assert.ok(ineligibleBeforeEligible.effects.saved[
+  ineligibleBeforeEligible.recordKey(
+    'LATER_ELIGIBLE:LATER_ELIGIBLE_KEY'
+  )
+]);
 
 function createPropertyStore(initial = {}) {
   const values = { ...initial };

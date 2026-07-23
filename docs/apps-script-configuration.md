@@ -19,7 +19,7 @@ The installer creates the ignored `config.apps-script.local.json` from
 | `run_interval_hours` | Trigger interval in hours; default `12`. |
 | `gmail_query` | Bounded Gmail search query. |
 | `lookback_days` | Maximum invitation age to scan. |
-| `max_messages_per_run` | Target cap; a started Gmail thread finishes atomically. |
+| `max_messages_per_run` | Eligible-invitation target; threads finish atomically. |
 | `max_attachments_per_run` | Hard cap for downloaded receipt files. |
 | `drive_folder_name` | Private Drive root title. |
 | `drive_output_folder_url` | Optional Drive folder URL used instead of the default root. |

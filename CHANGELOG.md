@@ -33,6 +33,8 @@ All notable changes to this project are documented in this file.
   were archived, while keeping each started thread atomic.
 - Replaced the oversized single-property idempotency ledger with bounded,
   migration-compatible Script Properties shards.
+- Fixed attachment download failures preventing the fetched registry JSON and
+  initial metadata from reaching Drive.
 
 ## [0.2.1] - 2026-07-19 - standalone installation fix
 

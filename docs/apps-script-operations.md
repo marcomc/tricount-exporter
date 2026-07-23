@@ -18,7 +18,9 @@ An already processed `(Gmail message ID, public share key)` pair is skipped.
 The durable processed-record list retains the newest 1,000 records.
 The corresponding Gmail thread receives the configured processed label only
 when every message in the thread was scanned and every detected Tricount URL
-was exported or already known. The message cap prevents the next thread from
+was exported or already known. Messages outside the configured date and subject
+checks, or without a valid Tricount share URL, do not consume the target, so
+they cannot starve later invitations. The target prevents the next thread from
 starting, but a thread already in progress is always scanned completely.
 The script preserves every message's existing read state. With the default
 configuration it then archives the thread, so it leaves Inbox and remains
@@ -56,8 +58,8 @@ not undo an otherwise successful import.
 - A Tricount API failure leaves the pair unprocessed, so a later run retries it.
 - A receipt failure is written into `tricount-info.json`; the raw JSON remains
   available and the invitation is treated as exported.
-- The message target stops before starting another Gmail thread; the attachment
-  cap remains strict.
+- The eligible-invitation target stops before starting another Gmail thread; the
+  attachment cap remains strict.
 - Trigger reconciliation creates the replacement before deleting the old trigger
   and requires exactly one valid 12-hour handler.
 

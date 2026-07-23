@@ -6,12 +6,15 @@ function runThreeCountExporter_() {
   const config = getThreeCountConfig_();
   const processed = getProcessedThreeCountRecords_();
   const processedLabel = getOrCreateThreeCountProcessedLabel_(config);
-  const summary = { scannedMessages: 0, discoveredUrls: 0, exported: [], skipped: [], errors: [] };
+  const summary = {
+    scannedMessages: 0, eligibleMessages: 0, discoveredUrls: 0,
+    exported: [], skipped: [], errors: []
+  };
   const cutoff = new Date(Date.now() - config.lookback_days * 24 * 60 * 60 * 1000);
   const pageSize = Math.min(100, config.max_messages_per_run);
   const seenThreadIds = {};
 
-  while (summary.scannedMessages < config.max_messages_per_run) {
+  while (summary.eligibleMessages < config.max_messages_per_run) {
     const threads = findUnseenThreeCountThreads_(
       config.gmail_query, pageSize, seenThreadIds
     );
@@ -20,7 +23,7 @@ function runThreeCountExporter_() {
     }
     for (let threadIndex = 0;
       threadIndex < threads.length &&
-      summary.scannedMessages < config.max_messages_per_run;
+      summary.eligibleMessages < config.max_messages_per_run;
       threadIndex += 1) {
       const thread = threads[threadIndex];
       seenThreadIds[thread.getId()] = true;
@@ -34,6 +37,10 @@ function runThreeCountExporter_() {
           continue;
         }
         const shares = extractThreeCountShareUrls_(message.getPlainBody());
+        if (!shares.length) {
+          continue;
+        }
+        summary.eligibleMessages += 1;
         for (let shareIndex = 0; shareIndex < shares.length; shareIndex += 1) {
           const share = shares[shareIndex];
           summary.discoveredUrls += 1;
@@ -90,6 +97,7 @@ function runThreeCountExporter_() {
   saveProcessedThreeCountRecords_(processed);
   console.log(JSON.stringify({
     event: 'three_count_export_complete', scannedMessages: summary.scannedMessages,
+    eligibleMessages: summary.eligibleMessages,
     discoveredUrls: summary.discoveredUrls, exported: summary.exported.length,
     skipped: summary.skipped.length, errors: summary.errors.length
   }));

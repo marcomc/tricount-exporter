@@ -78,6 +78,40 @@ assert.equal(
   null
 );
 
+const exportWrites = [];
+const exportSandbox = vm.createContext({ console: { warn: () => {} } });
+vm.runInContext(api, exportSandbox);
+exportSandbox.fetchThreeCountRegistry_ = () => ({
+  Response: [{ Registry: { title: 'Example Trip', all_registry_entry: [] } }]
+});
+exportSandbox.resolveThreeCountExportFolder_ = () => ({ getUrl: () => 'https://drive.google.com/example' });
+exportSandbox.sanitizeThreeCountFileComponent_ = () => 'example-trip';
+exportSandbox.writeThreeCountJsonFile_ = (_folder, name, data) => {
+  exportWrites.push({ name, data: JSON.parse(JSON.stringify(data)) });
+};
+exportSandbox.downloadThreeCountAttachments_ = () => {
+  assert.deepEqual(
+    exportWrites.map((write) => write.name),
+    ['transactions-example-trip.json', 'tricount-info.json']
+  );
+  throw new Error('attachment timeout');
+};
+const exportedAfterAttachmentFailure = exportSandbox.exportThreeCountShare_(
+  { key: 'EXAMPLE_SHARE_KEY', sourceUrl: 'https://tricount.com/EXAMPLE_SHARE_KEY' },
+  { getId: () => 'example-message-id', getDate: () => new Date('2026-07-23T00:00:00.000Z') }
+);
+assert.equal(exportedAfterAttachmentFailure.attachmentCount, 0);
+assert.equal(exportedAfterAttachmentFailure.attachmentFailures, 1);
+assert.deepEqual(
+  exportWrites.map((write) => write.name),
+  ['transactions-example-trip.json', 'tricount-info.json', 'tricount-info.json']
+);
+assert.deepEqual(exportWrites[1].data.attachment_result, { downloaded: 0, failures: [] });
+assert.deepEqual(exportWrites[2].data.attachment_result, {
+  downloaded: 0,
+  failures: [{ name: '', error: 'attachment timeout' }]
+});
+
 const unreadMessages = [
   { isUnread: () => true, markUnread: () => { unreadMessages[0].restored = true; } },
   { isUnread: () => false, markUnread: () => { unreadMessages[1].restored = true; } },
