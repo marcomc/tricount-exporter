@@ -15,3 +15,6 @@ response_data*.json
 transactions-*.json
 tricount-info.json
 Attachments */
+.installer/
+config.apps-script.local.json
+client_secret_*.apps.googleusercontent.com.json

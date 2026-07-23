@@ -2,9 +2,51 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-07-23 - `Tricount-Exporter` Google Apps Script automation
+
+### Added
+
+- Optional standalone `Tricount-Exporter` Google Apps Script automation.
+- Gmail invitation discovery, cloud-only Tricount JSON export, receipt download,
+  idempotent Drive output, time-based trigger lifecycle, and a resumable installer.
+- Added a configurable Gmail import-status label, applied after successful
+  imports without changing the email read state.
+- Added an append-only CSV import audit with source Gmail and Tricount URLs,
+  outcome, export location, attachment counts, and errors.
+- Added optional Drive output-root selection by folder URL while retaining the
+  default `My Drive/Tricount-Exporter` root.
+- Added interactive and non-interactive Apps Script configuration for output,
+  processed-mail labels, archive behavior, notifications, and interval.
+- Changed the default Apps Script trigger interval from daily to every 12 hours.
+
+### Fixed
+
+- Fixed Apps Script invitation recognition on runtimes without the JavaScript
+  `URL` global, including direct Tricount share links in real Gmail messages.
+- Fixed processed-thread archiving to preserve an invitation's existing unread
+  state.
+- Fixed mixed-outcome Gmail threads being labeled or archived before every
+  detected share URL was processed successfully.
+- Removed an unused Google Cloud Platform OAuth scope from the Apps Script
+  manifest.
+- Fixed Gmail pagination skipping eligible invitations after earlier results
+  were archived, while keeping each started thread atomic.
+- Replaced the oversized single-property idempotency ledger with bounded,
+  migration-compatible Script Properties shards.
+- Fixed attachment download failures preventing the fetched registry JSON and
+  initial metadata from reaching Drive.
+- Enforced the attachment-attempt cap across every Tricount in one Gmail run,
+  including failed fetch attempts.
+- Added a migration-safe run-wide share-URL limit so large invitations resume
+  idempotently without exceeding the Tricount API-attempt budget.
+- Prevented the audit log from overwriting an unrelated same-named CSV in the
+  selected Drive output root.
+- Made the Make targets portable across macOS and Linux CI runners by using
+  Bash-compatible shell constructs.
+
 ## [0.2.1] - 2026-07-19 - standalone installation fix
 
-### Fixed in 0.2.1
+### Fixed
 
 - Fixed `make install` on Python distributions that provide `pip3` without a
   `pip` script in virtual environments.
@@ -13,7 +55,7 @@ All notable changes to this project are documented in this file.
 
 ## [0.2.0] - 2026-07-18 - richer allocation exports
 
-### Added in 0.2.0
+### Added
 
 - Added per-member base and local shares, allocation types, and share ratios to
   the human-readable CSV and Excel exports.
@@ -26,7 +68,7 @@ All notable changes to this project are documented in this file.
 - Added research notes covering Tricount allocation data and the official
   Sesterce CSV import schema.
 
-### Changed in 0.2.0
+### Changed
 
 - Changed generated filenames to portable lowercase names without spaces or
   parentheses, including `transactions-<title>.json` for the raw API response.
@@ -39,7 +81,7 @@ All notable changes to this project are documented in this file.
 - Changed duplicate participant display names from silent allocation merging
   to an explicit export error.
 
-### Fixed in 0.2.0
+### Fixed
 
 - Fixed attachment filenames being omitted from the human CSV and Excel files
   even when the attachments were downloaded successfully.

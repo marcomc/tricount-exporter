@@ -9,6 +9,7 @@
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Usage Examples](#usage-examples)
+- [Google Apps Script Automation](#google-apps-script-automation)
 - [Human-readable CSV](#human-readable-csv)
 - [Sesterce CSV](#sesterce-csv)
 - [Output Layout](#output-layout)
@@ -60,10 +61,13 @@ For end users:
 
 - macOS or Linux
 - Python 3.11+
+- Bash
 - `make`
 
 For contributors:
 
+- Node.js for Apps Script validation
+- `jq` for the Apps Script installer preflight test
 - `markdownlint` for Markdown validation
 - `mypy` through the project virtual environment
 - `shellcheck` for shell script validation
@@ -88,8 +92,8 @@ make install
 - installs a default config template to
   `~/.config/tricount-exporter/config.toml` if one does not exist yet
 
-If `~/.local/bin` is not on your `PATH`, `make check-deps` tells you what to
-add to your shell profile.
+If `~/.local/bin` is not on your `PATH`, `make check-runtime-deps` tells you
+what to add to your shell profile.
 
 This means the installed `tricount-exporter` command keeps working even if you
 later delete or move the source checkout.
@@ -254,6 +258,29 @@ tricount-exporter \
   --url "https://tricount.com/KEY_FOUR"
 ```
 
+## Google Apps Script Automation
+
+`tricount-exporter` can provision a standalone Google Apps Script named
+`Tricount-Exporter`. It runs independently from this checkout and from the
+computer after installation: it checks Gmail every 12 hours by default for
+Tricount invitations, downloads the raw registry JSON and attachments, then
+writes title-based export folders and an audit CSV to Google Drive. Successful
+messages receive a configurable label, are archived without being marked read,
+and trigger a confirmation email.
+
+```bash
+make apps-script-check
+make apps-script-install
+```
+
+This is a separate cloud-only implementation because Python cannot run in Apps
+Script. The first setup uses a private Google Desktop OAuth client, creates the
+standalone script and its Drive folder, and configures the 12-hour trigger. It
+does not print or retain a Tricount API key. See the [installation guide]
+(docs/apps-script-installation.md), [configuration reference]
+(docs/apps-script-configuration.md), and [operations guide]
+(docs/apps-script-operations.md).
+
 ## Human-readable CSV
 
 The default semicolon-delimited CSV preserves the transaction date and time,
@@ -343,6 +370,8 @@ make install-dev
 
 `make install-dev` is for working on the repository itself. It uses the local
 `.venv` and does not define the user-facing installed command.
+
+Run `make check-deps` to verify the contributor tools before the full gate.
 
 Run the full maintainer quality gate:
 

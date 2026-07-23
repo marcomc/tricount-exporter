@@ -65,7 +65,7 @@ def test_main_version_prints_cli_version(capsys) -> None:
 def test_package_and_project_versions_are_synchronized() -> None:
     project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
 
-    assert project["project"]["version"] == cli.__version__ == "0.2.1"
+    assert project["project"]["version"] == cli.__version__ == "0.3.0"
 
 
 def test_cli_exports_csv_attachments_and_metadata(
@@ -262,6 +262,9 @@ def test_cli_clears_stale_outputs_on_reuse(
             "--output-dir",
             str(tmp_path),
             "--no-download-attachments",
+            "--no-write-excel",
+            "--no-write-sesterce",
+            "--no-save-response",
         ]
     )
 

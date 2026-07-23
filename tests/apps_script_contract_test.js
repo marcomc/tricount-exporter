@@ -1,0 +1,333 @@
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const root = path.resolve(__dirname, '..', 'apps-script');
+const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
+const projectRoot = path.resolve(__dirname, '..');
+const gmailIntake = read('GmailIntake.gs');
+const api = read('TricountApi.gs');
+const drive = read('DriveExport.gs');
+const importLog = read('ImportLog.gs');
+const installer = read('Installer.gs');
+const notifications = read('Notifications.gs');
+const automation = read('Automation.gs');
+const configSource = read('Config.gs');
+const manifest = JSON.parse(read('appsscript.json'));
+
+const installerConfig = JSON.parse(fs.readFileSync(
+  path.join(projectRoot, 'config.apps-script.example.json'),
+  'utf8'
+));
+assert.match(installerConfig.gmail_query, /subject:tricount/);
+assert.equal(
+  installerConfig.processed_label_name,
+  'Tricount-Exporter/Imported'
+);
+assert.equal(installerConfig.drive_output_folder_url, '');
+assert.equal(installerConfig.run_interval_hours, 12);
+assert.equal(installerConfig.max_share_urls_per_run, 100);
+assert.equal(installerConfig.archive_processed_threads, true);
+assert.equal(installerConfig.send_success_notification, true);
+assert.match(gmailIntake, /host !== 'tricount\.com' && !host\.endsWith\('\.tricount\.com'\)/);
+assert.doesNotMatch(gmailIntake, /endsWith\('tricount\.com'\)\) \{/);
+assert.match(gmailIntake, /message\.getPlainBody\(\)/);
+assert.match(api, /session-registry-installation/);
+assert.match(api, /public_identifier_token/);
+assert.match(drive, /folder\.createFile\(name, content, 'application\/json'\)/);
+assert.match(importLog, /tricount-exporter-import-log\.csv/);
+assert.match(importLog, /gmail_message_url/);
+assert.match(importLog, /text\/csv/);
+assert.match(importLog, /notification_status/);
+assert.match(installer, /ensureThreeCountImportLog_\(root\)/);
+assert.match(api, /attachment_result/);
+assert.match(automation, /runDailyThreeCountExporter/);
+assert.match(automation, /everyHours\(config\.run_interval_hours\)/);
+assert.match(automation, /LockService\.getScriptLock\(\)/);
+assert.match(gmailIntake, /thread\.addLabel\(processedLabel\)/);
+assert.match(gmailIntake, /thread\.moveToArchive\(\)/);
+assert.match(gmailIntake, /const unreadMessages = thread\.getMessages\(\)\.filter/);
+assert.match(gmailIntake, /threadMessage\.markUnread\(\)/);
+assert.match(gmailIntake, /GmailApp\.createLabel\(name\)/);
+assert.doesNotMatch(gmailIntake, /markRead\(/);
+assert.match(notifications, /MailApp\.sendEmail/);
+assert.deepEqual(manifest.executionApi, { access: 'MYSELF' });
+assert.ok(manifest.oauthScopes.includes('https://mail.google.com/'));
+assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/drive'));
+assert.ok(!manifest.oauthScopes.includes('https://www.googleapis.com/auth/cloud-platform'));
+assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/script.send_mail'));
+
+const legacyInstalledConfig = { ...installerConfig };
+delete legacyInstalledConfig.max_share_urls_per_run;
+let storedAutomationConfig = JSON.stringify(legacyInstalledConfig);
+const configSandbox = vm.createContext({
+  PropertiesService: {
+    getScriptProperties: () => ({
+      getProperty: () => storedAutomationConfig,
+      setProperty: (_key, value) => {
+        storedAutomationConfig = value;
+      },
+    }),
+  },
+});
+vm.runInContext(configSource, configSandbox);
+const migratedInstalledConfig = configSandbox.getThreeCountConfig_();
+assert.equal(migratedInstalledConfig.max_share_urls_per_run, 100);
+assert.equal(
+  JSON.parse(storedAutomationConfig).max_share_urls_per_run,
+  100
+);
+assert.throws(
+  () => configSandbox.validateThreeCountConfig_({
+    ...installerConfig,
+    max_share_urls_per_run: 501,
+  }),
+  /exceeds the supported bounds/
+);
+
+const appsScriptSandbox = vm.createContext({
+  URL: undefined,
+  decodeURIComponent,
+});
+vm.runInContext(gmailIntake, appsScriptSandbox);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(appsScriptSandbox.normalizeThreeCountShareUrl_(
+    'https://tricount.com/EXAMPLE_SHARE_KEY'
+  ))),
+  {
+    key: 'EXAMPLE_SHARE_KEY',
+    sourceUrl: 'https://tricount.com/EXAMPLE_SHARE_KEY',
+  }
+);
+assert.equal(
+  appsScriptSandbox.normalizeThreeCountShareUrl_('https://nottricount.com/EXAMPLE_SHARE_KEY'),
+  null
+);
+
+const exportWrites = [];
+const exportSandbox = vm.createContext({ console: { warn: () => {} } });
+vm.runInContext(api, exportSandbox);
+exportSandbox.fetchThreeCountRegistry_ = () => ({
+  Response: [{ Registry: { title: 'Example Trip', all_registry_entry: [] } }]
+});
+exportSandbox.resolveThreeCountExportFolder_ = () => ({ getUrl: () => 'https://drive.google.com/example' });
+exportSandbox.sanitizeThreeCountFileComponent_ = () => 'example-trip';
+exportSandbox.writeThreeCountJsonFile_ = (_folder, name, data) => {
+  exportWrites.push({ name, data: JSON.parse(JSON.stringify(data)) });
+};
+const exportAttachmentBudget = { remaining: 5 };
+exportSandbox.downloadThreeCountAttachments_ = (
+  _registry,
+  _folder,
+  attachmentBudget
+) => {
+  assert.equal(attachmentBudget, exportAttachmentBudget);
+  assert.deepEqual(
+    exportWrites.map((write) => write.name),
+    ['transactions-example-trip.json', 'tricount-info.json']
+  );
+  throw new Error('attachment timeout');
+};
+const exportedAfterAttachmentFailure = exportSandbox.exportThreeCountShare_(
+  { key: 'EXAMPLE_SHARE_KEY', sourceUrl: 'https://tricount.com/EXAMPLE_SHARE_KEY' },
+  { getId: () => 'example-message-id', getDate: () => new Date('2026-07-23T00:00:00.000Z') },
+  exportAttachmentBudget
+);
+assert.equal(exportedAfterAttachmentFailure.attachmentCount, 0);
+assert.equal(exportedAfterAttachmentFailure.attachmentFailures, 1);
+assert.deepEqual(
+  exportWrites.map((write) => write.name),
+  ['transactions-example-trip.json', 'tricount-info.json', 'tricount-info.json']
+);
+assert.deepEqual(exportWrites[1].data.attachment_result, { downloaded: 0, failures: [] });
+assert.deepEqual(exportWrites[2].data.attachment_result, {
+  downloaded: 0,
+  failures: [{ name: '', error: 'attachment timeout' }]
+});
+
+let attachmentFetchAttempts = 0;
+let attachmentFolderResolutions = 0;
+let attachmentFolderClears = 0;
+const attachmentSandbox = vm.createContext({
+  UrlFetchApp: {
+    fetch: () => {
+      attachmentFetchAttempts += 1;
+      throw new Error('attachment fetch failed');
+    },
+  },
+});
+vm.runInContext(drive, attachmentSandbox);
+attachmentSandbox.getOrCreateThreeCountChildFolder_ = () => {
+  attachmentFolderResolutions += 1;
+  return {};
+};
+attachmentSandbox.clearThreeCountFolder_ = () => {
+  attachmentFolderClears += 1;
+};
+const runAttachmentBudget = { remaining: 1 };
+const firstShareAttachmentResult =
+  attachmentSandbox.downloadThreeCountAttachments_(
+    {
+      title: 'First share',
+      all_registry_entry: [{
+        RegistryEntry: {
+          attachment: [{
+            urls: [{ url: 'https://example.test/first.jpg' }],
+          }],
+        },
+      }],
+    },
+    {},
+    runAttachmentBudget
+  );
+const secondShareAttachmentResult =
+  attachmentSandbox.downloadThreeCountAttachments_(
+    {
+      title: 'Second share',
+      all_registry_entry: [{
+        RegistryEntry: {
+          attachment: [{
+            urls: [{ url: 'https://example.test/second.jpg' }],
+          }],
+        },
+      }],
+    },
+    {},
+    runAttachmentBudget
+  );
+assert.equal(runAttachmentBudget.remaining, 0);
+assert.equal(attachmentFetchAttempts, 1);
+assert.equal(firstShareAttachmentResult.downloaded, 0);
+assert.equal(firstShareAttachmentResult.failures.length, 1);
+assert.equal(secondShareAttachmentResult.downloaded, 0);
+assert.match(
+  secondShareAttachmentResult.failures[0].error,
+  /Attachment run limit reached/
+);
+assert.equal(attachmentFolderResolutions, 1);
+assert.equal(attachmentFolderClears, 1);
+
+function createThreeCountImportLogFile(name, content) {
+  return {
+    name,
+    content,
+    getBlob: function () {
+      return { getDataAsString: () => this.content };
+    },
+    setContent: function (value) {
+      this.content = value;
+    }
+  };
+}
+
+function createThreeCountFileIterator(files) {
+  let index = 0;
+  return {
+    hasNext: () => index < files.length,
+    next: () => files[index++]
+  };
+}
+
+const unrelatedImportLog = createThreeCountImportLogFile(
+  'tricount-exporter-import-log.csv',
+  'unrelated,contents\nkeep,this\n'
+);
+const managedImportLog = createThreeCountImportLogFile(
+  'tricount-exporter-import-log-2.csv',
+  [
+    'logged_at,status,tricount_title,tricount_url,export_folder_url,gmail_message_url,',
+    'gmail_message_id,email_received_at,attachments_downloaded,attachment_failures,',
+    'notification_status,error\n'
+  ].join('')
+);
+const importLogFiles = [unrelatedImportLog, managedImportLog];
+const importLogRoot = {
+  getFilesByName: (name) => createThreeCountFileIterator(
+    importLogFiles.filter((file) => file.name === name)
+  ),
+  createFile: (name, content) => {
+    const file = createThreeCountImportLogFile(name, content);
+    importLogFiles.push(file);
+    return file;
+  }
+};
+const importLogSandbox = vm.createContext({
+  getThreeCountRootFolder_: () => importLogRoot,
+  encodeURIComponent
+});
+vm.runInContext(importLog, importLogSandbox);
+assert.equal(importLogSandbox.ensureThreeCountImportLog_(importLogRoot), managedImportLog);
+assert.equal(importLogSandbox.ensureThreeCountImportLog_(importLogRoot), managedImportLog);
+importLogSandbox.appendThreeCountImportLog_({ status: 'success' });
+assert.equal(unrelatedImportLog.content, 'unrelated,contents\nkeep,this\n');
+assert.match(managedImportLog.content, /"success"/);
+
+const collisionOnlyFile = createThreeCountImportLogFile(
+  'tricount-exporter-import-log.csv',
+  'not,the,managed,header\n'
+);
+const collisionOnlyFiles = [collisionOnlyFile];
+const collisionOnlyRoot = {
+  getFilesByName: (name) => createThreeCountFileIterator(
+    collisionOnlyFiles.filter((file) => file.name === name)
+  ),
+  createFile: (name, content) => {
+    const file = createThreeCountImportLogFile(name, content);
+    collisionOnlyFiles.push(file);
+    return file;
+  }
+};
+const allocatedImportLog = importLogSandbox.ensureThreeCountImportLog_(collisionOnlyRoot);
+assert.equal(allocatedImportLog.name, 'tricount-exporter-import-log-2.csv');
+assert.equal(collisionOnlyFile.content, 'not,the,managed,header\n');
+
+const unreadMessages = [
+  { isUnread: () => true, markUnread: () => { unreadMessages[0].restored = true; } },
+  { isUnread: () => false, markUnread: () => { unreadMessages[1].restored = true; } },
+  { isUnread: () => true, markUnread: () => { unreadMessages[2].restored = true; } },
+];
+const archiveThread = {
+  getMessages: () => unreadMessages,
+  moveToArchive: () => { archiveThread.archived = true; },
+};
+appsScriptSandbox.archiveThreeCountProcessedThread_(archiveThread, { archive_processed_threads: true });
+assert.equal(archiveThread.archived, true);
+assert.equal(unreadMessages[0].restored, true);
+assert.equal(unreadMessages[1].restored, undefined);
+assert.equal(unreadMessages[2].restored, true);
+
+const sentNotifications = [];
+const notificationSandbox = vm.createContext({
+  MailApp: { sendEmail: (message) => { sentNotifications.push(message); } },
+  Session: { getEffectiveUser: () => ({ getEmail: () => 'owner@example.test' }) },
+  console: { warn: () => {} },
+  getThreeCountGmailMessageUrl_: () => 'https://mail.google.com/example',
+});
+vm.runInContext(notifications, notificationSandbox);
+assert.equal(notificationSandbox.sendThreeCountSuccessNotification_(
+  {},
+  { sourceUrl: 'https://tricount.com/EXAMPLE_SHARE_KEY' },
+  { title: 'Example\nBcc: injected@example.test', folderUrl: 'https://drive.google.com/example', attachmentCount: 0, attachmentFailures: 0 },
+  { send_success_notification: true, notification_email: '' }
+), 'sent');
+assert.doesNotMatch(sentNotifications[0].subject, /[\r\n]/);
+assert.doesNotMatch(sentNotifications[0].body, /[\r\n](Bcc|Cc|To):/);
+
+const installerSandbox = vm.createContext({});
+vm.runInContext(installer, installerSandbox);
+assert.equal(
+  installerSandbox.extractThreeCountDriveFolderId_(
+    'https://drive.google.com/drive/folders/EXAMPLE_FOLDER_ID?usp=share_link'
+  ),
+  'EXAMPLE_FOLDER_ID'
+);
+assert.throws(
+  () => installerSandbox.extractThreeCountDriveFolderId_('https://example.com/folder'),
+  /Google Drive folder URL/
+);
+
+console.log('Apps Script contract tests passed.');

@@ -1,4 +1,4 @@
-SHELL := /bin/zsh
+SHELL := /bin/bash
 VENV := .venv
 PY := $(VENV)/bin/python
 MARKDOWN_FILES := README.md CHANGELOG.md TODO.md AGENTS.md docs/*.md
@@ -14,24 +14,37 @@ APP_PY := $(APP_VENV)/bin/python
 
 .DEFAULT_GOAL := help
 
-.PHONY: help check-deps venv app-venv install install-dev install-link install-config uninstall lint test check run clean
+.NOTPARALLEL: apps-script-install apps-script-uninstall
+.PHONY: help check-runtime-deps check-deps venv app-venv install install-dev install-link install-config uninstall lint test check run clean
+.PHONY: apps-script-check apps-script-install apps-script-status apps-script-uninstall
 
 help: ## Show available targets
 	@awk 'BEGIN { FS = ":.*##" } /^[a-zA-Z_-]+:.*##/ { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-check-deps: ## Verify required system prerequisites
+check-runtime-deps: ## Verify end-user system prerequisites
 	@command -v python3 >/dev/null 2>&1 \
 		|| { echo "python3 not found"; exit 1; }
 	@python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" \
 		|| { echo "Python 3.11+ required (found $$(python3 --version 2>&1))"; exit 1; }
-	@mkdir -p "$(BINDIR)" "$(CONFIG_DIR)"
-	@if print -r -- "$$PATH" | tr ':' '\n' | grep -Fx "$(BINDIR)" >/dev/null; then \
+	@command -v bash >/dev/null 2>&1 \
+		|| { echo "bash not found; Bash is required by the Make recipes."; exit 1; }
+	@if printf '%s\n' "$$PATH" | tr ':' '\n' | grep -Fx "$(BINDIR)" >/dev/null; then \
 		echo "$(BINDIR) is on PATH"; \
 	else \
 		echo "$(BINDIR) is not on PATH"; \
 		echo "Add this to your shell profile:"; \
 		echo "export PATH=\"$(BINDIR):\$$PATH\""; \
 	fi
+
+check-deps: check-runtime-deps ## Verify contributor prerequisites for make check
+	@command -v node >/dev/null 2>&1 \
+		|| { echo "node not found; Node.js is required for Apps Script validation."; exit 1; }
+	@command -v jq >/dev/null 2>&1 \
+		|| { echo "jq not found; jq is required for the Apps Script installer preflight test."; exit 1; }
+	@command -v markdownlint >/dev/null 2>&1 \
+		|| { echo "markdownlint not found; install markdownlint-cli to run make check."; exit 1; }
+	@command -v shellcheck >/dev/null 2>&1 \
+		|| { echo "shellcheck not found; install ShellCheck to run make check."; exit 1; }
 
 venv: ## Create the virtual environment
 	@if [[ ! -d "$(VENV)" ]]; then \
@@ -48,7 +61,7 @@ app-venv: ## Create the standalone runtime virtual environment
 	"$(APP_PY)" -m ensurepip --upgrade
 	"$(APP_PY)" -m pip install --upgrade pip
 
-install: check-deps app-venv ## Install the CLI in a standalone user venv
+install: check-runtime-deps app-venv ## Install the CLI in a standalone user venv
 	"$(APP_PY)" -m pip install setuptools wheel
 	"$(APP_PY)" -m pip install --no-build-isolation .
 	@$(MAKE) install-link install-config
@@ -79,20 +92,36 @@ uninstall: ## Remove the linked CLI and standalone runtime environment
 	@rm -rf "$(APP_HOME)"
 	@echo "Removed $(INSTALL_PATH)"
 
-lint: venv ## Run Python and Markdown checks
+lint: check-deps venv ## Run Python and Markdown checks
 	PYTHONPATH=src "$(PY)" -m ruff check src tests
 	PYTHONPATH=src "$(PY)" -m ruff format --check src tests
 	PYTHONPATH=src "$(PY)" -m mypy src
 	markdownlint --config .markdownlint.json $(MARKDOWN_FILES)
 	shellcheck --enable=all scripts/*.sh
 
-test: venv ## Run regression tests
+test: check-deps venv ## Run regression tests
 	PYTHONPATH=src "$(PY)" -m pytest -q
+	node scripts/validate-apps-script.js
+	node tests/apps_script_contract_test.js
+	node tests/apps_script_gmail_intake_test.js
+	bash tests/apps_script_installer_test.sh
 
 check: lint test ## Run the full maintainer quality gate
+
+apps-script-check: ## Validate optional Google Apps Script prerequisites and source
+	./scripts/install-google-apps-script.sh --check
+
+apps-script-install: ## Provision the standalone Tricount-Exporter Apps Script
+	./scripts/install-google-apps-script.sh
+
+apps-script-status: ## Read the installed Apps Script status without mutation
+	./scripts/install-google-apps-script.sh --status
+
+apps-script-uninstall: ## Remove this Apps Script's managed time-based trigger
+	./scripts/install-google-apps-script.sh --uninstall
 
 run: install ## Show CLI help
 	"$(INSTALL_PATH)" --help
 
 clean: ## Remove local build and virtualenv artifacts
-	rm -rf $(VENV) .mypy_cache .ruff_cache build dist src/*.egg-info(N) *.egg-info(N)
+	rm -rf $(VENV) .mypy_cache .ruff_cache build dist src/*.egg-info *.egg-info

@@ -1,0 +1,15 @@
+{
+  "time_zone": "Europe/Rome",
+  "run_interval_hours": 12,
+  "gmail_query": "in:inbox newer_than:30d subject:tricount",
+  "lookback_days": 30,
+  "max_messages_per_run": 100,
+  "max_share_urls_per_run": 100,
+  "max_attachments_per_run": 100,
+  "drive_folder_name": "Tricount-Exporter",
+  "drive_output_folder_url": "",
+  "processed_label_name": "Tricount-Exporter/Imported",
+  "archive_processed_threads": true,
+  "notification_email": "",
+  "send_success_notification": true
+}
