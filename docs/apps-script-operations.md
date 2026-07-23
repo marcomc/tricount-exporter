@@ -17,7 +17,9 @@ Tricount registry, then writes raw JSON and attachments to Drive.
 An already processed `(Gmail message ID, public share key)` pair is skipped.
 The durable processed-record list retains the newest 1,000 records.
 The corresponding Gmail thread receives the configured processed label only
-when every detected Tricount URL in that thread was exported or already known.
+when every message in the thread was scanned and every detected Tricount URL
+was exported or already known. The message cap prevents the next thread from
+starting, but a thread already in progress is always scanned completely.
 The script preserves every message's existing read state. With the default
 configuration it then archives the thread, so it leaves Inbox and remains
 available through the processed label.
@@ -54,8 +56,8 @@ not undo an otherwise successful import.
 - A Tricount API failure leaves the pair unprocessed, so a later run retries it.
 - A receipt failure is written into `tricount-info.json`; the raw JSON remains
   available and the invitation is treated as exported.
-- Per-run message and attachment caps prevent a large mailbox from consuming
-  the full Apps Script execution budget.
+- The message target stops before starting another Gmail thread; the attachment
+  cap remains strict.
 - Trigger reconciliation creates the replacement before deleting the old trigger
   and requires exactly one valid 12-hour handler.
 

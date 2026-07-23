@@ -19,7 +19,7 @@ The installer creates the ignored `config.apps-script.local.json` from
 | `run_interval_hours` | Trigger interval in hours; default `12`. |
 | `gmail_query` | Bounded Gmail search query. |
 | `lookback_days` | Maximum invitation age to scan. |
-| `max_messages_per_run` | Hard cap for scanned messages. |
+| `max_messages_per_run` | Target cap; a started Gmail thread finishes atomically. |
 | `max_attachments_per_run` | Hard cap for downloaded receipt files. |
 | `drive_folder_name` | Private Drive root title. |
 | `drive_output_folder_url` | Optional Drive folder URL used instead of the default root. |
@@ -35,11 +35,16 @@ The installer creates the ignored `config.apps-script.local.json` from
 | `AUTOMATION_CONFIG_JSON` | Validated installer configuration. |
 | `DRIVE_ROOT_FOLDER_ID` | Private Drive export root. |
 | `TRICOUNT_PUBLIC_KEY_PEM` | Public installation key used by the Tricount session handshake. |
-| `PROCESSED_RECORDS_JSON` | Bounded Gmail-message/key idempotency state. |
+| `PROCESSED_RECORDS_MANIFEST_JSON` | Active idempotency-state shard list. |
+| `PROCESSED_RECORDS_V2_<bank>_<index>` | Bounded shards of hashed Gmail-message/key records. |
+| `PROCESSED_RECORDS_JSON` | Legacy idempotency state, migrated on the next run. |
 | `INSTALLER_COMPLETED_AT` | Installation timestamp. |
 
 `TRICOUNT_PUBLIC_KEY_PEM` is not a secret. No Tricount credential, Gmail
 content, OAuth token, or private RSA key is stored in Script Properties.
+Processed-record identifiers are SHA-256 hashes. Each shard stays below the
+Apps Script per-property value limit, and only the newest 1,000 records are
+retained.
 
 ## Gmail eligibility
 
@@ -56,7 +61,8 @@ added you to my tricount” and whose body contains `Join: https://tricount.com/
 It never saves the email body.
 
 After a successful import, the script applies `processed_label_name` to the
-Gmail thread without changing its read state. The default is
+Gmail thread only after every message in that thread was scanned, without
+changing its read state. The default is
 `Tricount-Exporter/Imported`. When `archive_processed_threads` is `true` (the
 default), the labeled thread is removed from Inbox while remaining unread and
 available through its label or All Mail.

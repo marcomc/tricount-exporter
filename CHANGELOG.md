@@ -29,6 +29,10 @@ All notable changes to this project are documented in this file.
   detected share URL was processed successfully.
 - Removed an unused Google Cloud Platform OAuth scope from the Apps Script
   manifest.
+- Fixed Gmail pagination skipping eligible invitations after earlier results
+  were archived, while keeping each started thread atomic.
+- Replaced the oversized single-property idempotency ledger with bounded,
+  migration-compatible Script Properties shards.
 
 ## [0.2.1] - 2026-07-19 - standalone installation fix
 
