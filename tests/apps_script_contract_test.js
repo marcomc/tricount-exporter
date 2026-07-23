@@ -16,6 +16,7 @@ const importLog = read('ImportLog.gs');
 const installer = read('Installer.gs');
 const notifications = read('Notifications.gs');
 const automation = read('Automation.gs');
+const configSource = read('Config.gs');
 const manifest = JSON.parse(read('appsscript.json'));
 
 const installerConfig = JSON.parse(fs.readFileSync(
@@ -29,6 +30,7 @@ assert.equal(
 );
 assert.equal(installerConfig.drive_output_folder_url, '');
 assert.equal(installerConfig.run_interval_hours, 12);
+assert.equal(installerConfig.max_share_urls_per_run, 100);
 assert.equal(installerConfig.archive_processed_threads, true);
 assert.equal(installerConfig.send_success_notification, true);
 assert.match(gmailIntake, /host !== 'tricount\.com' && !host\.endsWith\('\.tricount\.com'\)/);
@@ -58,6 +60,34 @@ assert.ok(manifest.oauthScopes.includes('https://mail.google.com/'));
 assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/drive'));
 assert.ok(!manifest.oauthScopes.includes('https://www.googleapis.com/auth/cloud-platform'));
 assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/script.send_mail'));
+
+const legacyInstalledConfig = { ...installerConfig };
+delete legacyInstalledConfig.max_share_urls_per_run;
+let storedAutomationConfig = JSON.stringify(legacyInstalledConfig);
+const configSandbox = vm.createContext({
+  PropertiesService: {
+    getScriptProperties: () => ({
+      getProperty: () => storedAutomationConfig,
+      setProperty: (_key, value) => {
+        storedAutomationConfig = value;
+      },
+    }),
+  },
+});
+vm.runInContext(configSource, configSandbox);
+const migratedInstalledConfig = configSandbox.getThreeCountConfig_();
+assert.equal(migratedInstalledConfig.max_share_urls_per_run, 100);
+assert.equal(
+  JSON.parse(storedAutomationConfig).max_share_urls_per_run,
+  100
+);
+assert.throws(
+  () => configSandbox.validateThreeCountConfig_({
+    ...installerConfig,
+    max_share_urls_per_run: 501,
+  }),
+  /exceeds the supported bounds/
+);
 
 const appsScriptSandbox = vm.createContext({
   URL: undefined,

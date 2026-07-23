@@ -2,6 +2,7 @@ const THREE_COUNT_CONFIG = Object.freeze({
   APP_VERSION: '0.3.0',
   API_BASE_URL: 'https://api.tricount.bunq.com',
   DAILY_HANDLER: 'runDailyThreeCountExporter',
+  DEFAULT_MAX_SHARE_URLS_PER_RUN: 100,
   MAX_RUNTIME_MS: 280000,
   PROPERTY_KEYS: Object.freeze({
     AUTOMATION_CONFIG_JSON: 'AUTOMATION_CONFIG_JSON',
@@ -29,7 +30,8 @@ function getThreeCountSetupStatus() {
 }
 
 function getThreeCountConfig_() {
-  const raw = PropertiesService.getScriptProperties().getProperty(
+  const properties = PropertiesService.getScriptProperties();
+  const raw = properties.getProperty(
     THREE_COUNT_CONFIG.PROPERTY_KEYS.AUTOMATION_CONFIG_JSON
   );
   if (!raw) {
@@ -41,7 +43,20 @@ function getThreeCountConfig_() {
   } catch (error) {
     throw new Error('AUTOMATION_CONFIG_JSON is invalid: ' + error.message);
   }
+  const requiresMigration = !Object.prototype.hasOwnProperty.call(
+    config, 'max_share_urls_per_run'
+  );
+  if (requiresMigration) {
+    config.max_share_urls_per_run =
+      THREE_COUNT_CONFIG.DEFAULT_MAX_SHARE_URLS_PER_RUN;
+  }
   validateThreeCountConfig_(config);
+  if (requiresMigration) {
+    properties.setProperty(
+      THREE_COUNT_CONFIG.PROPERTY_KEYS.AUTOMATION_CONFIG_JSON,
+      JSON.stringify(config)
+    );
+  }
   return config;
 }
 
@@ -54,13 +69,17 @@ function validateThreeCountConfig_(config) {
       throw new Error('Automation configuration requires ' + key + '.');
     }
   });
-  ['run_interval_hours', 'lookback_days', 'max_messages_per_run', 'max_attachments_per_run']
+  [
+    'run_interval_hours', 'lookback_days', 'max_messages_per_run',
+    'max_share_urls_per_run', 'max_attachments_per_run'
+  ]
     .forEach(function (key) {
       if (!Number.isInteger(config[key]) || config[key] < 1) {
         throw new Error('Automation configuration requires a positive integer ' + key + '.');
       }
     });
   if (config.run_interval_hours > 23 || config.max_messages_per_run > 500 ||
+    config.max_share_urls_per_run > 500 ||
     config.max_attachments_per_run > 500) {
     throw new Error('Automation configuration exceeds the supported bounds.');
   }

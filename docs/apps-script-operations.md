@@ -62,6 +62,9 @@ not undo an otherwise successful import.
 - A receipt failure is written into `tricount-info.json`; the raw JSON remains
   available and the invitation is treated as exported.
 - The eligible-invitation target stops before starting another Gmail thread.
+  The share-URL cap counts every new Tricount API export attempt, including
+  failures. When reached inside a thread, completed pairs are persisted and the
+  thread remains unarchived so the next run skips them and continues.
   The attachment cap is shared by every Tricount in the Gmail run and counts
   failed fetch attempts.
 - Trigger reconciliation creates the replacement before deleting the old trigger

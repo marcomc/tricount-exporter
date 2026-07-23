@@ -8,14 +8,17 @@ function runThreeCountExporter_() {
   const processedLabel = getOrCreateThreeCountProcessedLabel_(config);
   const summary = {
     scannedMessages: 0, eligibleMessages: 0, discoveredUrls: 0,
+    shareAttempts: 0, shareLimitReached: false,
     exported: [], skipped: [], errors: []
   };
   const cutoff = new Date(Date.now() - config.lookback_days * 24 * 60 * 60 * 1000);
   const pageSize = Math.min(100, config.max_messages_per_run);
   const seenThreadIds = {};
   const attachmentBudget = { remaining: config.max_attachments_per_run };
+  const shareBudget = { remaining: config.max_share_urls_per_run };
 
-  while (summary.eligibleMessages < config.max_messages_per_run) {
+  while (summary.eligibleMessages < config.max_messages_per_run &&
+    shareBudget.remaining > 0 && !summary.shareLimitReached) {
     const threads = findUnseenThreeCountThreads_(
       config.gmail_query, pageSize, seenThreadIds
     );
@@ -24,13 +27,15 @@ function runThreeCountExporter_() {
     }
     for (let threadIndex = 0;
       threadIndex < threads.length &&
-      summary.eligibleMessages < config.max_messages_per_run;
+      summary.eligibleMessages < config.max_messages_per_run &&
+      shareBudget.remaining > 0 && !summary.shareLimitReached;
       threadIndex += 1) {
       const thread = threads[threadIndex];
       seenThreadIds[thread.getId()] = true;
       const messages = thread.getMessages();
       let shouldFinalizeThread = false;
       let threadHasFailure = false;
+      let threadIncomplete = false;
       for (let messageIndex = 0; messageIndex < messages.length; messageIndex += 1) {
         const message = messages[messageIndex];
         summary.scannedMessages += 1;
@@ -53,6 +58,13 @@ function runThreeCountExporter_() {
             summary.skipped.push({ messageId: message.getId(), keySuffix: shortThreeCountKey_(share.key) });
             continue;
           }
+          if (shareBudget.remaining <= 0) {
+            summary.shareLimitReached = true;
+            threadIncomplete = true;
+            break;
+          }
+          shareBudget.remaining -= 1;
+          summary.shareAttempts += 1;
           try {
             const exported = exportThreeCountShare_(
               share, message, attachmentBudget
@@ -83,8 +95,11 @@ function runThreeCountExporter_() {
             summary.errors.push({ keySuffix: shortThreeCountKey_(share.key), error: errorMessage });
           }
         }
+        if (threadIncomplete) {
+          break;
+        }
       }
-      if (shouldFinalizeThread && !threadHasFailure) {
+      if (!threadIncomplete && shouldFinalizeThread && !threadHasFailure) {
         try {
           thread.addLabel(processedLabel);
           archiveThreeCountProcessedThread_(thread, config);
@@ -95,12 +110,17 @@ function runThreeCountExporter_() {
           });
         }
       }
+      if (summary.shareLimitReached) {
+        break;
+      }
     }
   }
   saveProcessedThreeCountRecords_(processed);
   console.log(JSON.stringify({
     event: 'three_count_export_complete', scannedMessages: summary.scannedMessages,
     eligibleMessages: summary.eligibleMessages,
+    shareAttempts: summary.shareAttempts,
+    shareLimitReached: summary.shareLimitReached,
     discoveredUrls: summary.discoveredUrls, exported: summary.exported.length,
     skipped: summary.skipped.length, errors: summary.errors.length
   }));

@@ -37,6 +37,8 @@ All notable changes to this project are documented in this file.
   initial metadata from reaching Drive.
 - Enforced the attachment-attempt cap across every Tricount in one Gmail run,
   including failed fetch attempts.
+- Added a migration-safe run-wide share-URL limit so large invitations resume
+  idempotently without exceeding the Tricount API-attempt budget.
 - Prevented the audit log from overwriting an unrelated same-named CSV in the
   selected Drive output root.
 - Made the Make targets portable across macOS and Linux CI runners by using

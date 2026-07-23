@@ -53,6 +53,7 @@ function createScenario({
   messages = [createMessage()],
   maxAttachments = 100,
   maxMessages = 100,
+  maxShares = 100,
   threadCount = 1,
   threadMessages = null,
 } = {}) {
@@ -113,6 +114,7 @@ function createScenario({
       gmail_query: 'in:inbox subject:tricount',
       max_attachments_per_run: maxAttachments,
       max_messages_per_run: maxMessages,
+      max_share_urls_per_run: maxShares,
       archive_processed_threads: true,
     }),
     getProcessedThreeCountRecords_: () => ({ ...normalizedProcessed }),
@@ -232,7 +234,11 @@ assert.ok(cappedThread.effects.saved[
   cappedThread.recordKey('SECOND_MESSAGE:SECOND_KEY')
 ]);
 
-const paginated = createScenario({ maxMessages: 150, threadCount: 150 });
+const paginated = createScenario({
+  maxMessages: 150,
+  maxShares: 150,
+  threadCount: 150,
+});
 const paginatedSummary = paginated.run();
 assert.equal(paginatedSummary.scannedMessages, 150);
 assert.equal(paginatedSummary.exported.length, 150);
@@ -294,6 +300,76 @@ assert.equal(
   sharedAttachmentBudget.effects.attachmentBudgets[0],
   sharedAttachmentBudget.effects.attachmentBudgets[1]
 );
+
+const continuationBody = [
+  'Join: https://tricount.com/CONTINUATION_A',
+  'https://tricount.com/CONTINUATION_B',
+  'https://tricount.com/CONTINUATION_C',
+].join(' ');
+const continuationFirstRun = createScenario({
+  maxShares: 2,
+  messages: [createMessage({ body: continuationBody })],
+});
+const continuationFirstSummary = continuationFirstRun.run();
+assert.equal(continuationFirstSummary.shareAttempts, 2);
+assert.equal(continuationFirstSummary.shareLimitReached, true);
+assert.equal(continuationFirstSummary.exported.length, 2);
+assert.equal(continuationFirstRun.effects.labels, 0);
+assert.equal(continuationFirstRun.effects.archived, 0);
+assert.ok(continuationFirstRun.effects.saved[
+  continuationFirstRun.recordKey(
+    'EXAMPLE_MESSAGE_ID:CONTINUATION_A'
+  )
+]);
+assert.ok(continuationFirstRun.effects.saved[
+  continuationFirstRun.recordKey(
+    'EXAMPLE_MESSAGE_ID:CONTINUATION_B'
+  )
+]);
+assert.equal(continuationFirstRun.effects.saved[
+  continuationFirstRun.recordKey(
+    'EXAMPLE_MESSAGE_ID:CONTINUATION_C'
+  )
+], undefined);
+
+const continuationSecondRun = createScenario({
+  maxShares: 2,
+  messages: [createMessage({ body: continuationBody })],
+  processed: {
+    'EXAMPLE_MESSAGE_ID:CONTINUATION_A': '2026-07-23T01:00:00.000Z',
+    'EXAMPLE_MESSAGE_ID:CONTINUATION_B': '2026-07-23T01:00:01.000Z',
+  },
+});
+const continuationSecondSummary = continuationSecondRun.run();
+assert.equal(continuationSecondSummary.shareAttempts, 1);
+assert.equal(continuationSecondSummary.shareLimitReached, false);
+assert.equal(continuationSecondSummary.skipped.length, 2);
+assert.equal(continuationSecondSummary.exported.length, 1);
+assert.equal(continuationSecondRun.effects.labels, 1);
+assert.equal(continuationSecondRun.effects.archived, 1);
+assert.ok(continuationSecondRun.effects.saved[
+  continuationSecondRun.recordKey(
+    'EXAMPLE_MESSAGE_ID:CONTINUATION_C'
+  )
+]);
+
+const failedShareConsumesBudget = createScenario({
+  exportError: new Error('Tricount API failed'),
+  failingKey: 'FAILURE_A',
+  maxShares: 1,
+  messages: [createMessage({
+    body: [
+      'Join: https://tricount.com/FAILURE_A',
+      'https://tricount.com/FAILURE_B',
+    ].join(' '),
+  })],
+});
+const failedShareBudgetSummary = failedShareConsumesBudget.run();
+assert.equal(failedShareBudgetSummary.shareAttempts, 1);
+assert.equal(failedShareBudgetSummary.shareLimitReached, true);
+assert.equal(failedShareBudgetSummary.errors.length, 1);
+assert.equal(failedShareConsumesBudget.effects.labels, 0);
+assert.equal(failedShareConsumesBudget.effects.archived, 0);
 
 function createPropertyStore(initial = {}) {
   const values = { ...initial };

@@ -20,6 +20,7 @@ The installer creates the ignored `config.apps-script.local.json` from
 | `gmail_query` | Bounded Gmail search query. |
 | `lookback_days` | Maximum invitation age to scan. |
 | `max_messages_per_run` | Eligible-invitation target; threads finish atomically. |
+| `max_share_urls_per_run` | Hard cap on new Tricount API export attempts per run. |
 | `max_attachments_per_run` | Hard per-run cap on receipt fetch attempts, including failures. |
 | `drive_folder_name` | Private Drive root title. |
 | `drive_output_folder_url` | Optional Drive folder URL used instead of the default root. |
@@ -45,6 +46,9 @@ content, OAuth token, or private RSA key is stored in Script Properties.
 Processed-record identifiers are SHA-256 hashes. Each shard stays below the
 Apps Script per-property value limit, and only the newest 1,000 records are
 retained.
+
+Existing installations without `max_share_urls_per_run` are migrated to the
+default `100` before the next Gmail run.
 
 ## Gmail eligibility
 

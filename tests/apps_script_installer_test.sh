@@ -68,6 +68,28 @@ jq '.drive_output_folder_url = "https://example.test/not-a-drive-folder"' \
   >"${invalid_url_fixture}/config.apps-script.local.json"
 assert_invalid_config_stops_before_remote_changes "${invalid_url_fixture}"
 
+invalid_share_limit_fixture="$(create_fixture invalid-share-limit)"
+jq '.max_share_urls_per_run = 501' \
+  "${invalid_share_limit_fixture}/config.apps-script.example.json" \
+  >"${invalid_share_limit_fixture}/config.apps-script.local.json"
+assert_invalid_config_stops_before_remote_changes "${invalid_share_limit_fixture}"
+
+legacy_config_fixture="$(create_fixture legacy-config)"
+jq 'del(.max_share_urls_per_run)' \
+  "${legacy_config_fixture}/config.apps-script.example.json" \
+  >"${legacy_config_fixture}/config.apps-script.local.json"
+if PATH="${temporary_dir}/bin:${PATH}" \
+  "${legacy_config_fixture}/scripts/install-google-apps-script.sh" \
+  >/dev/null 2>&1; then
+  printf '%s\n' 'fixture installer unexpectedly completed' >&2
+  exit 1
+fi
+jq -e '.max_share_urls_per_run == 100' \
+  "${legacy_config_fixture}/config.apps-script.local.json" >/dev/null || {
+  printf '%s\n' 'legacy config did not receive the share-URL limit' >&2
+  exit 1
+}
+
 status_fixture="$(create_fixture status-state)"
 status_state_dir="${status_fixture}/.installer/tricount-exporter"
 mkdir -p "${status_state_dir}/clasp-owner-auth"

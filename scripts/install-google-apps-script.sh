@@ -70,6 +70,7 @@ ensure_config() {
     (.gmail_query | type == "string" and length > 0) and
     (.lookback_days | type == "number" and floor == . and . >= 1) and
     (.max_messages_per_run | type == "number" and floor == . and . >= 1 and . <= 500) and
+    (.max_share_urls_per_run | type == "number" and floor == . and . >= 1 and . <= 500) and
     (.max_attachments_per_run | type == "number" and floor == . and . >= 1 and . <= 500) and
     (.drive_folder_name | type == "string" and length > 0) and
     (.drive_output_folder_url | type == "string" and
@@ -86,6 +87,9 @@ migrate_config() {
   temporary_file="$(mktemp "${STATE_DIR}/config.XXXXXX")"
   jq '
     .run_interval_hours = (.run_interval_hours // 12) |
+    if has("max_share_urls_per_run") then . else
+      .max_share_urls_per_run = 100
+    end |
     del(.daily_trigger_hour) |
     .drive_output_folder_url = (.drive_output_folder_url // "") |
     .processed_label_name = (.processed_label_name // "Tricount-Exporter/Imported") |
