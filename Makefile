@@ -14,7 +14,9 @@ APP_PY := $(APP_VENV)/bin/python
 
 .DEFAULT_GOAL := help
 
+.NOTPARALLEL: apps-script-install apps-script-uninstall
 .PHONY: help check-deps venv app-venv install install-dev install-link install-config uninstall lint test check run clean
+.PHONY: apps-script-check apps-script-install apps-script-status apps-script-uninstall
 
 help: ## Show available targets
 	@awk 'BEGIN { FS = ":.*##" } /^[a-zA-Z_-]+:.*##/ { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -88,8 +90,23 @@ lint: venv ## Run Python and Markdown checks
 
 test: venv ## Run regression tests
 	PYTHONPATH=src "$(PY)" -m pytest -q
+	node scripts/validate-apps-script.js
+	node tests/apps_script_contract_test.js
+	bash tests/apps_script_installer_test.sh
 
 check: lint test ## Run the full maintainer quality gate
+
+apps-script-check: ## Validate optional Google Apps Script prerequisites and source
+	./scripts/install-google-apps-script.sh --check
+
+apps-script-install: ## Provision the standalone Tricount-Exporter Apps Script
+	./scripts/install-google-apps-script.sh
+
+apps-script-status: ## Read the installed Apps Script status without mutation
+	./scripts/install-google-apps-script.sh --status
+
+apps-script-uninstall: ## Remove this Apps Script's managed daily trigger
+	./scripts/install-google-apps-script.sh --uninstall
 
 run: install ## Show CLI help
 	"$(INSTALL_PATH)" --help

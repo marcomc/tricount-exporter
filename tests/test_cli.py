@@ -262,6 +262,9 @@ def test_cli_clears_stale_outputs_on_reuse(
             "--output-dir",
             str(tmp_path),
             "--no-download-attachments",
+            "--no-write-excel",
+            "--no-write-sesterce",
+            "--no-save-response",
         ]
     )
 
