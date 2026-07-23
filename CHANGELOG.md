@@ -35,6 +35,8 @@ All notable changes to this project are documented in this file.
   migration-compatible Script Properties shards.
 - Fixed attachment download failures preventing the fetched registry JSON and
   initial metadata from reaching Drive.
+- Prevented the audit log from overwriting an unrelated same-named CSV in the
+  selected Drive output root.
 
 ## [0.2.1] - 2026-07-19 - standalone installation fix
 

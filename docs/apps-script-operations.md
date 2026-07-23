@@ -37,11 +37,14 @@ a read-only setup check.
 
 ## Import audit log
 
-The selected output root contains `tricount-exporter-import-log.csv`. A new
-successful import appends its timestamp, Tricount title and URL, export folder
-URL, source Gmail message URL and ID, attachment counts, and an empty error
-field. A failed import appends the same traceability fields where available and
-the failure message. Idempotent skips are not logged again.
+The selected output root contains `tricount-exporter-import-log.csv`. If that
+name already belongs to another file, the automation uses the first available
+numbered name such as `tricount-exporter-import-log-2.csv`; it reuses only a
+file with the exact managed CSV header. A new successful import appends its
+timestamp, Tricount title and URL, export folder URL, source Gmail message URL
+and ID, attachment counts, and an empty error field. A failed import appends
+the same traceability fields where available and the failure message. Idempotent
+skips are not logged again.
 
 The file is ordinary CSV rather than a Google Sheet, so it can be opened in
 Sheets, Excel, or another CSV reader without an additional service.

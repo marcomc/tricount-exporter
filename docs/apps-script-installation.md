@@ -83,7 +83,9 @@ by setting `drive_output_folder_url` in the ignored
 
 The supplied folder becomes the export root; title-named Tricount folders and
 `tricount-exporter-import-log.csv` are created directly inside it. Use a folder
-where the trigger owner can create files and subfolders.
+where the trigger owner can create files and subfolders. If that filename is
+already used by another file, the audit log receives a numbered suffix instead
+of overwriting it.
 
 ## One-time authorization
 

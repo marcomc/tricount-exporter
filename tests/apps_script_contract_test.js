@@ -112,6 +112,80 @@ assert.deepEqual(exportWrites[2].data.attachment_result, {
   failures: [{ name: '', error: 'attachment timeout' }]
 });
 
+function createThreeCountImportLogFile(name, content) {
+  return {
+    name,
+    content,
+    getBlob: function () {
+      return { getDataAsString: () => this.content };
+    },
+    setContent: function (value) {
+      this.content = value;
+    }
+  };
+}
+
+function createThreeCountFileIterator(files) {
+  let index = 0;
+  return {
+    hasNext: () => index < files.length,
+    next: () => files[index++]
+  };
+}
+
+const unrelatedImportLog = createThreeCountImportLogFile(
+  'tricount-exporter-import-log.csv',
+  'unrelated,contents\nkeep,this\n'
+);
+const managedImportLog = createThreeCountImportLogFile(
+  'tricount-exporter-import-log-2.csv',
+  [
+    'logged_at,status,tricount_title,tricount_url,export_folder_url,gmail_message_url,',
+    'gmail_message_id,email_received_at,attachments_downloaded,attachment_failures,',
+    'notification_status,error\n'
+  ].join('')
+);
+const importLogFiles = [unrelatedImportLog, managedImportLog];
+const importLogRoot = {
+  getFilesByName: (name) => createThreeCountFileIterator(
+    importLogFiles.filter((file) => file.name === name)
+  ),
+  createFile: (name, content) => {
+    const file = createThreeCountImportLogFile(name, content);
+    importLogFiles.push(file);
+    return file;
+  }
+};
+const importLogSandbox = vm.createContext({
+  getThreeCountRootFolder_: () => importLogRoot,
+  encodeURIComponent
+});
+vm.runInContext(importLog, importLogSandbox);
+assert.equal(importLogSandbox.ensureThreeCountImportLog_(importLogRoot), managedImportLog);
+assert.equal(importLogSandbox.ensureThreeCountImportLog_(importLogRoot), managedImportLog);
+importLogSandbox.appendThreeCountImportLog_({ status: 'success' });
+assert.equal(unrelatedImportLog.content, 'unrelated,contents\nkeep,this\n');
+assert.match(managedImportLog.content, /"success"/);
+
+const collisionOnlyFile = createThreeCountImportLogFile(
+  'tricount-exporter-import-log.csv',
+  'not,the,managed,header\n'
+);
+const collisionOnlyFiles = [collisionOnlyFile];
+const collisionOnlyRoot = {
+  getFilesByName: (name) => createThreeCountFileIterator(
+    collisionOnlyFiles.filter((file) => file.name === name)
+  ),
+  createFile: (name, content) => {
+    const file = createThreeCountImportLogFile(name, content);
+    collisionOnlyFiles.push(file);
+    return file;
+  }
+};
+const allocatedImportLog = importLogSandbox.ensureThreeCountImportLog_(collisionOnlyRoot);
+assert.equal(allocatedImportLog.name, 'tricount-exporter-import-log-2.csv');
+assert.equal(collisionOnlyFile.content, 'not,the,managed,header\n');
+
 const unreadMessages = [
   { isUnread: () => true, markUnread: () => { unreadMessages[0].restored = true; } },
   { isUnread: () => false, markUnread: () => { unreadMessages[1].restored = true; } },
