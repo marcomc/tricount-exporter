@@ -8,7 +8,7 @@
   "max_attachments_per_run": 100,
   "drive_folder_name": "Tricount-Exporter",
   "drive_output_folder_url": "",
-  "processed_label_name": "Tricount-Exporter/Imported",
+  "processed_label_name": "Tricount-Exporter/Exported",
   "archive_processed_threads": true,
   "notification_email": "",
   "send_success_notification": true

@@ -13,9 +13,9 @@ function sendThreeCountSuccessNotification_(message, share, exported, config) {
     const messageUrl = normalizeThreeCountNotificationText_(getThreeCountGmailMessageUrl_(message));
     MailApp.sendEmail({
       to: recipient,
-      subject: '[Tricount-Exporter] Imported: ' + title,
+      subject: '[Tricount-Exporter] Exported: ' + title,
       body: [
-        'Tricount imported successfully.',
+        'Tricount exported successfully.',
         '',
         'Title: ' + title,
         'Export folder: ' + folderUrl,

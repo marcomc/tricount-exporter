@@ -61,7 +61,7 @@ the portable defaults. For unattended setup, create
 
 ```bash
 TRICOUNT_EXPORTER_DRIVE_OUTPUT_FOLDER_URL='https://drive.google.com/drive/folders/FOLDER_ID' \
-TRICOUNT_EXPORTER_PROCESSED_LABEL_NAME='Tricount-Exporter/Imported' \
+TRICOUNT_EXPORTER_PROCESSED_LABEL_NAME='Tricount-Exporter/Exported' \
 TRICOUNT_EXPORTER_NOTIFICATION_EMAIL='owner@example.com' \
 TRICOUNT_EXPORTER_ARCHIVE_PROCESSED_THREADS=true \
 TRICOUNT_EXPORTER_SEND_SUCCESS_NOTIFICATION=true \

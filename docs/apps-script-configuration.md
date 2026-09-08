@@ -24,10 +24,10 @@ The installer creates the ignored `config.apps-script.local.json` from
 | `max_attachments_per_run` | Hard per-run cap on receipt fetch attempts, including failures. |
 | `drive_folder_name` | Private Drive root title. |
 | `drive_output_folder_url` | Optional Drive folder URL used instead of the default root. |
-| `processed_label_name` | Gmail label applied after a successful import. |
+| `processed_label_name` | Gmail label applied after a successful export. |
 | `archive_processed_threads` | Archive a labeled successful thread without marking it read. |
-| `notification_email` | Optional success-notification recipient. Blank leaves notifications unsent without affecting imports. |
-| `send_success_notification` | Send confirmation emails after successful imports. |
+| `notification_email` | Optional success-notification recipient. Blank leaves notifications unsent without affecting exports. |
+| `send_success_notification` | Send confirmation emails after successful exports. |
 
 ## Script Properties
 
@@ -64,15 +64,15 @@ The detector is compatible with invitations whose subject begins “Hey, I've
 added you to my tricount” and whose body contains `Join: https://tricount.com/…`.
 It never saves the email body.
 
-After a successful import, the script applies `processed_label_name` to the
+After a successful export, the script applies `processed_label_name` to the
 Gmail thread only after every message in that thread was scanned, without
 changing its read state. The default is
-`Tricount-Exporter/Imported`. When `archive_processed_threads` is `true` (the
+`Tricount-Exporter/Exported`. When `archive_processed_threads` is `true` (the
 default), the labeled thread is removed from Inbox while remaining unread and
 available through its label or All Mail.
 
 Success notifications require an explicit `notification_email`. A blank value
-is recorded as `not-sent:no-recipient` and does not affect import success,
+is recorded as `not-sent:no-recipient` and does not affect export success,
 processed-label application, or thread archival. Set
 `send_success_notification` to `false` to disable notification attempts.
 
@@ -106,6 +106,6 @@ Tricount-Exporter/
 The export directory is title-based. If the same sanitized title belongs to a
 different public key, the new directory receives a short key suffix. Metadata
 records the source message ID and attachment failures without copying email
-contents. The CSV audit contains one row for every new successful import and
-every failed import attempt, with the Tricount URL, destination folder URL, and
+contents. The CSV audit contains one row for every new successful export and
+every failed export attempt, with the Tricount URL, destination folder URL, and
 source Gmail message URL. Idempotent skips do not create duplicate rows.
