@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [0.3.1] - 2026-09-08 - Apps Script importer improvements
 
 - Add safety guidelines for Apps Script importer and enhance transaction handling to the AGENTS.md file.
 
