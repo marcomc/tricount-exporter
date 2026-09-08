@@ -54,7 +54,9 @@ assert.match(gmailIntake, /const unreadMessages = thread\.getMessages\(\)\.filte
 assert.match(gmailIntake, /threadMessage\.markUnread\(\)/);
 assert.match(gmailIntake, /GmailApp\.createLabel\(name\)/);
 assert.doesNotMatch(gmailIntake, /markRead\(/);
+assert.match(gmailIntake, /isThreeCountGeneratedNotification_\(message\.getSubject\(\)\)/);
 assert.match(notifications, /MailApp\.sendEmail/);
+assert.doesNotMatch(notifications, /Session\.getEffectiveUser/);
 assert.deepEqual(manifest.executionApi, { access: 'MYSELF' });
 assert.ok(manifest.oauthScopes.includes('https://mail.google.com/'));
 assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/drive'));
@@ -303,7 +305,6 @@ assert.equal(unreadMessages[2].restored, true);
 const sentNotifications = [];
 const notificationSandbox = vm.createContext({
   MailApp: { sendEmail: (message) => { sentNotifications.push(message); } },
-  Session: { getEffectiveUser: () => ({ getEmail: () => 'owner@example.test' }) },
   console: { warn: () => {} },
   getThreeCountGmailMessageUrl_: () => 'https://mail.google.com/example',
 });
@@ -313,6 +314,13 @@ assert.equal(notificationSandbox.sendThreeCountSuccessNotification_(
   { sourceUrl: 'https://tricount.com/EXAMPLE_SHARE_KEY' },
   { title: 'Example\nBcc: injected@example.test', folderUrl: 'https://drive.google.com/example', attachmentCount: 0, attachmentFailures: 0 },
   { send_success_notification: true, notification_email: '' }
+), 'not-sent:no-recipient');
+assert.equal(sentNotifications.length, 0);
+assert.equal(notificationSandbox.sendThreeCountSuccessNotification_(
+  {},
+  { sourceUrl: 'https://tricount.com/EXAMPLE_SHARE_KEY' },
+  { title: 'Example\nBcc: injected@example.test', folderUrl: 'https://drive.google.com/example', attachmentCount: 0, attachmentFailures: 0 },
+  { send_success_notification: true, notification_email: 'owner@example.test' }
 ), 'sent');
 assert.doesNotMatch(sentNotifications[0].subject, /[\r\n]/);
 assert.doesNotMatch(sentNotifications[0].body, /[\r\n](Bcc|Cc|To):/);

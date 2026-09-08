@@ -2,11 +2,11 @@ function sendThreeCountSuccessNotification_(message, share, exported, config) {
   if (!config.send_success_notification) {
     return 'disabled';
   }
-  const recipient = String(config.notification_email || Session.getEffectiveUser().getEmail() || '').trim();
-  if (!recipient) {
-    return 'not-sent:no-recipient';
-  }
   try {
+    const recipient = String(config.notification_email || '').trim();
+    if (!recipient) {
+      return 'not-sent:no-recipient';
+    }
     const title = normalizeThreeCountNotificationText_(exported.title);
     const folderUrl = normalizeThreeCountNotificationText_(exported.folderUrl);
     const sourceUrl = normalizeThreeCountNotificationText_(share.sourceUrl);

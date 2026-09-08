@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+- Add safety guidelines for Apps Script importer and enhance transaction handling to the AGENTS.md file.
+
+### Fixed
+
+- Made success notifications non-blocking when the recipient is unavailable or
+  email delivery fails, while preserving import logging and Gmail label/archive
+  finalization.
+- Removed the undeclared `Session.getEffectiveUser()` notification fallback;
+  notifications now require an explicit configured recipient.
+- Prevented exporter-generated success notifications from being re-ingested as
+  Tricount invitations.
+
 ## [0.3.0] - 2026-07-23 - `Tricount-Exporter` Google Apps Script automation
 
 ### Added
