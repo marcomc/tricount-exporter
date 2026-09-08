@@ -39,7 +39,9 @@ function runThreeCountExporter_() {
       for (let messageIndex = 0; messageIndex < messages.length; messageIndex += 1) {
         const message = messages[messageIndex];
         summary.scannedMessages += 1;
-        if (message.getDate() < cutoff || !isThreeCountInvitationSubject_(message.getSubject())) {
+        if (message.getDate() < cutoff ||
+          isThreeCountGeneratedNotification_(message.getSubject()) ||
+          !isThreeCountInvitationSubject_(message.getSubject())) {
           continue;
         }
         const shares = extractThreeCountShareUrls_(message.getPlainBody());
@@ -69,7 +71,19 @@ function runThreeCountExporter_() {
             const exported = exportThreeCountShare_(
               share, message, attachmentBudget
             );
-            const notificationStatus = sendThreeCountSuccessNotification_(message, share, exported, config);
+            let notificationStatus;
+            try {
+              notificationStatus = sendThreeCountSuccessNotification_(
+                message, share, exported, config
+              );
+            } catch (notificationError) {
+              notificationStatus = 'not-sent:' + String(
+                notificationError.message || notificationError
+              );
+              console.warn(
+                'Tricount success notification failed: ' + notificationStatus
+              );
+            }
             appendThreeCountImportLog_({
               status: 'success', message: message, share: share, exported: exported,
               notificationStatus: notificationStatus
@@ -169,6 +183,10 @@ function getOrCreateThreeCountProcessedLabel_(config) {
 
 function isThreeCountInvitationSubject_(subject) {
   return String(subject || '').toLowerCase().indexOf('tricount') >= 0;
+}
+
+function isThreeCountGeneratedNotification_(subject) {
+  return /^\[tricount-exporter\]\s+imported:/i.test(String(subject || '').trim());
 }
 
 function extractThreeCountShareUrls_(body) {

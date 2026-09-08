@@ -49,6 +49,7 @@ function createMessage({
 function createScenario({
   processed = {},
   exportError = null,
+  notificationError = null,
   failingKey = '',
   messages = [createMessage()],
   maxAttachments = 100,
@@ -92,7 +93,7 @@ function createScenario({
     inbox.push(thread);
   }
   const sandbox = vm.createContext({
-    console: { log: () => {} },
+    console: { log: () => {}, warn: () => {} },
     GmailApp: {
       search: (_query, offset, limit) => {
         effects.searchCalls.push({ offset, limit });
@@ -138,6 +139,9 @@ function createScenario({
     },
     sendThreeCountSuccessNotification_: () => {
       effects.notifications += 1;
+      if (notificationError) {
+        throw notificationError;
+      }
       return 'sent';
     },
     appendThreeCountImportLog_: (entry) => { effects.logs.push(entry); },
@@ -162,6 +166,22 @@ assert.equal(successful.effects.logs.length, 1);
 assert.equal(successful.effects.logs[0].status, 'success');
 assert.ok(successful.effects.saved[
   successful.recordKey('EXAMPLE_MESSAGE_ID:EXAMPLE_SHARE_KEY')
+]);
+
+const notificationFailure = createScenario({
+  notificationError: new Error('notification recipient unavailable'),
+});
+const notificationFailureSummary = notificationFailure.run();
+assert.equal(notificationFailureSummary.exported.length, 1);
+assert.equal(notificationFailureSummary.errors.length, 0);
+assert.equal(notificationFailure.effects.labels, 1);
+assert.equal(notificationFailure.effects.archived, 1);
+assert.match(
+  notificationFailure.effects.logs[0].notificationStatus,
+  /^not-sent:notification recipient unavailable$/
+);
+assert.ok(notificationFailure.effects.saved[
+  notificationFailure.recordKey('EXAMPLE_MESSAGE_ID:EXAMPLE_SHARE_KEY')
 ]);
 
 const idempotent = createScenario({
@@ -280,6 +300,20 @@ assert.ok(ineligibleBeforeEligible.effects.saved[
     'LATER_ELIGIBLE:LATER_ELIGIBLE_KEY'
   )
 ]);
+
+const generatedNotification = createScenario({
+  messages: [createMessage({
+    id: 'GENERATED_NOTIFICATION',
+    subject: '[Tricount-Exporter] Imported: Example',
+    body: 'Tricount imported successfully.\nhttps://tricount.com/ALREADY_EXPORTED',
+  })],
+});
+const generatedNotificationSummary = generatedNotification.run();
+assert.equal(generatedNotificationSummary.scannedMessages, 1);
+assert.equal(generatedNotificationSummary.eligibleMessages, 0);
+assert.equal(generatedNotificationSummary.exported.length, 0);
+assert.equal(generatedNotification.effects.labels, 0);
+assert.equal(generatedNotification.effects.archived, 0);
 
 const sharedAttachmentBudget = createScenario({
   maxAttachments: 1,

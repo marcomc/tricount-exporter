@@ -26,7 +26,7 @@ The installer creates the ignored `config.apps-script.local.json` from
 | `drive_output_folder_url` | Optional Drive folder URL used instead of the default root. |
 | `processed_label_name` | Gmail label applied after a successful import. |
 | `archive_processed_threads` | Archive a labeled successful thread without marking it read. |
-| `notification_email` | Optional success-notification recipient; blank uses the trigger owner. |
+| `notification_email` | Optional success-notification recipient. Blank leaves notifications unsent without affecting imports. |
 | `send_success_notification` | Send confirmation emails after successful imports. |
 
 ## Script Properties
@@ -71,9 +71,10 @@ changing its read state. The default is
 default), the labeled thread is removed from Inbox while remaining unread and
 available through its label or All Mail.
 
-By default, `send_success_notification` sends a confirmation to the trigger
-owner. Set `notification_email` to direct confirmations elsewhere, or set
-`send_success_notification` to `false` to disable them.
+Success notifications require an explicit `notification_email`. A blank value
+is recorded as `not-sent:no-recipient` and does not affect import success,
+processed-label application, or thread archival. Set
+`send_success_notification` to `false` to disable notification attempts.
 
 ## Output root
 
