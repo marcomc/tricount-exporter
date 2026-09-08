@@ -1,4 +1,5 @@
 SHELL := /bin/bash
+PYTHON ?= python3
 VENV := .venv
 PY := $(VENV)/bin/python
 MARKDOWN_FILES := README.md CHANGELOG.md TODO.md AGENTS.md docs/*.md
@@ -22,10 +23,12 @@ help: ## Show available targets
 	@awk 'BEGIN { FS = ":.*##" } /^[a-zA-Z_-]+:.*##/ { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 check-runtime-deps: ## Verify end-user system prerequisites
-	@command -v python3 >/dev/null 2>&1 \
-		|| { echo "python3 not found"; exit 1; }
-	@python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" \
-		|| { echo "Python 3.11+ required (found $$(python3 --version 2>&1))"; exit 1; }
+	@python_bin="$(PYTHON)"; \
+	if [[ -x "$(APP_PY)" ]]; then python_bin="$(APP_PY)"; fi; \
+	command -v "$$python_bin" >/dev/null 2>&1 \
+		|| { echo "$$python_bin not found"; exit 1; }; \
+	"$$python_bin" -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" \
+		|| { echo "Python 3.11+ required (found $$($$python_bin --version 2>&1))"; exit 1; }
 	@command -v bash >/dev/null 2>&1 \
 		|| { echo "bash not found; Bash is required by the Make recipes."; exit 1; }
 	@if printf '%s\n' "$$PATH" | tr ':' '\n' | grep -Fx "$(BINDIR)" >/dev/null; then \
@@ -36,7 +39,9 @@ check-runtime-deps: ## Verify end-user system prerequisites
 		echo "export PATH=\"$(BINDIR):\$$PATH\""; \
 	fi
 
-check-deps: check-runtime-deps ## Verify contributor prerequisites for make check
+check-deps: venv ## Verify contributor prerequisites for make check
+	@"$(PY)" -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" \
+		|| { echo "Python 3.11+ required in $(VENV) (found $$($(PY) --version 2>&1))"; exit 1; }
 	@command -v node >/dev/null 2>&1 \
 		|| { echo "node not found; Node.js is required for Apps Script validation."; exit 1; }
 	@command -v jq >/dev/null 2>&1 \
@@ -47,16 +52,24 @@ check-deps: check-runtime-deps ## Verify contributor prerequisites for make chec
 		|| { echo "shellcheck not found; install ShellCheck to run make check."; exit 1; }
 
 venv: ## Create the virtual environment
-	@if [[ ! -d "$(VENV)" ]]; then \
-		python3 -m venv "$(VENV)"; \
+	@if [[ ! -x "$(PY)" ]]; then \
+		command -v "$(PYTHON)" >/dev/null 2>&1 \
+			|| { echo "$(PYTHON) not found"; exit 1; }; \
+		"$(PYTHON)" -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" \
+			|| { echo "Python 3.11+ required to create $(VENV) (found $$($(PYTHON) --version 2>&1))"; exit 1; }; \
+		"$(PYTHON)" -m venv "$(VENV)"; \
 	fi
 	"$(PY)" -m ensurepip --upgrade
 	"$(PY)" -m pip install --upgrade pip
 
 app-venv: ## Create the standalone runtime virtual environment
 	@mkdir -p "$(APP_HOME)"
-	@if [[ ! -d "$(APP_VENV)" ]]; then \
-		python3 -m venv "$(APP_VENV)"; \
+	@if [[ ! -x "$(APP_PY)" ]]; then \
+		command -v "$(PYTHON)" >/dev/null 2>&1 \
+			|| { echo "$(PYTHON) not found"; exit 1; }; \
+		"$(PYTHON)" -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" \
+			|| { echo "Python 3.11+ required to create $(APP_VENV) (found $$($(PYTHON) --version 2>&1))"; exit 1; }; \
+		"$(PYTHON)" -m venv "$(APP_VENV)"; \
 	fi
 	"$(APP_PY)" -m ensurepip --upgrade
 	"$(APP_PY)" -m pip install --upgrade pip
@@ -66,7 +79,7 @@ install: check-runtime-deps app-venv ## Install the CLI in a standalone user ven
 	"$(APP_PY)" -m pip install --no-build-isolation .
 	@$(MAKE) install-link install-config
 
-install-dev: check-deps venv ## Install repo-local dev dependencies
+install-dev: check-deps ## Install repo-local dev dependencies
 	"$(PY)" -m pip install setuptools wheel
 	"$(PY)" -m pip install -e ".[dev]"
 	@$(MAKE) install-config
@@ -92,14 +105,14 @@ uninstall: ## Remove the linked CLI and standalone runtime environment
 	@rm -rf "$(APP_HOME)"
 	@echo "Removed $(INSTALL_PATH)"
 
-lint: check-deps venv ## Run Python and Markdown checks
+lint: check-deps ## Run Python and Markdown checks
 	PYTHONPATH=src "$(PY)" -m ruff check src tests
 	PYTHONPATH=src "$(PY)" -m ruff format --check src tests
 	PYTHONPATH=src "$(PY)" -m mypy src
 	markdownlint --config .markdownlint.json $(MARKDOWN_FILES)
 	shellcheck --enable=all scripts/*.sh
 
-test: check-deps venv ## Run regression tests
+test: check-deps ## Run regression tests
 	PYTHONPATH=src "$(PY)" -m pytest -q
 	node scripts/validate-apps-script.js
 	node tests/apps_script_contract_test.js

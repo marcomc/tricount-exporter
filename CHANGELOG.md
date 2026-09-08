@@ -8,6 +8,8 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Made contributor validation reuse an existing local virtualenv instead of
+  failing on an unrelated older system `python3`.
 - Made success notifications non-blocking when the recipient is unavailable or
   email delivery fails, while preserving import logging and Gmail label/archive
   finalization.

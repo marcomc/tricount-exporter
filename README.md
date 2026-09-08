@@ -371,6 +371,11 @@ make install-dev
 `make install-dev` is for working on the repository itself. It uses the local
 `.venv` and does not define the user-facing installed command.
 
+`make check` and the contributor targets reuse an existing `.venv`. When
+creating it for the first time, the default `python3` must be Python 3.11 or
+newer. To select another compatible bootstrap interpreter, set `PYTHON`, for
+example `make PYTHON=python3.12 install-dev`.
+
 Run `make check-deps` to verify the contributor tools before the full gate.
 
 Run the full maintainer quality gate:
