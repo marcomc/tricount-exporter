@@ -304,8 +304,8 @@ assert.ok(ineligibleBeforeEligible.effects.saved[
 const generatedNotification = createScenario({
   messages: [createMessage({
     id: 'GENERATED_NOTIFICATION',
-    subject: '[Tricount-Exporter] Imported: Example',
-    body: 'Tricount imported successfully.\nhttps://tricount.com/ALREADY_EXPORTED',
+    subject: '[Tricount-Exporter] Exported: Example',
+    body: 'Tricount exported successfully.\nhttps://tricount.com/ALREADY_EXPORTED',
   })],
 });
 const generatedNotificationSummary = generatedNotification.run();
@@ -314,6 +314,17 @@ assert.equal(generatedNotificationSummary.eligibleMessages, 0);
 assert.equal(generatedNotificationSummary.exported.length, 0);
 assert.equal(generatedNotification.effects.labels, 0);
 assert.equal(generatedNotification.effects.archived, 0);
+
+const legacyGeneratedNotification = createScenario({
+  messages: [createMessage({
+    id: 'LEGACY_GENERATED_NOTIFICATION',
+    subject: '[Tricount-Exporter] Imported: Example',
+    body: 'Tricount imported successfully.\nhttps://tricount.com/ALREADY_EXPORTED',
+  })],
+});
+const legacyGeneratedNotificationSummary = legacyGeneratedNotification.run();
+assert.equal(legacyGeneratedNotificationSummary.eligibleMessages, 0);
+assert.equal(legacyGeneratedNotificationSummary.exported.length, 0);
 
 const sharedAttachmentBudget = createScenario({
   maxAttachments: 1,

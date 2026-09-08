@@ -26,7 +26,7 @@ const installerConfig = JSON.parse(fs.readFileSync(
 assert.match(installerConfig.gmail_query, /subject:tricount/);
 assert.equal(
   installerConfig.processed_label_name,
-  'Tricount-Exporter/Imported'
+  'Tricount-Exporter/Exported'
 );
 assert.equal(installerConfig.drive_output_folder_url, '');
 assert.equal(installerConfig.run_interval_hours, 12);
@@ -54,6 +54,7 @@ assert.match(gmailIntake, /const unreadMessages = thread\.getMessages\(\)\.filte
 assert.match(gmailIntake, /threadMessage\.markUnread\(\)/);
 assert.match(gmailIntake, /GmailApp\.createLabel\(name\)/);
 assert.doesNotMatch(gmailIntake, /markRead\(/);
+assert.match(gmailIntake, /Tricount-Exporter\/Exported/);
 assert.match(gmailIntake, /isThreeCountGeneratedNotification_\(message\.getSubject\(\)\)/);
 assert.match(notifications, /MailApp\.sendEmail/);
 assert.doesNotMatch(notifications, /Session\.getEffectiveUser/);
@@ -322,6 +323,7 @@ assert.equal(notificationSandbox.sendThreeCountSuccessNotification_(
   { title: 'Example\nBcc: injected@example.test', folderUrl: 'https://drive.google.com/example', attachmentCount: 0, attachmentFailures: 0 },
   { send_success_notification: true, notification_email: 'owner@example.test' }
 ), 'sent');
+assert.match(sentNotifications[0].subject, /^\[Tricount-Exporter\] Exported:/);
 assert.doesNotMatch(sentNotifications[0].subject, /[\r\n]/);
 assert.doesNotMatch(sentNotifications[0].body, /[\r\n](Bcc|Cc|To):/);
 

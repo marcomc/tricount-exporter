@@ -232,7 +232,7 @@ Project-wide policy also requires:
 - no user-specific absolute paths in repo configuration or documentation,
   except where required for clickable local file references during agent output
 
-## Apps Script Importer Safety
+## Apps Script Exporter Safety
 
 - Test Apps Script code without assuming browser or Node globals are available;
   cover missing runtime APIs with a regression before deploying parser changes.
@@ -241,7 +241,7 @@ Project-wide policy also requires:
   each message's original unread state after archival when needed.
 - Validate installer configuration before any remote source push or other
   deploy-side effect, and keep requested OAuth scopes limited to direct use.
-- Model scheduled imports as one run-wide state machine: preserve durable raw
+- Model scheduled exports as one run-wide state machine: preserve durable raw
   output before optional downloads, advance past rejected candidates, and
   verify ownership before reusing an existing audit destination.
 - Carry documented quotas and attempt budgets through every nested share,

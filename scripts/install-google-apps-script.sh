@@ -143,8 +143,8 @@ prompt_initial_config() {
   [[ -t 0 && -t 1 && "${TRICOUNT_EXPORTER_NON_INTERACTIVE:-}" != '1' ]] || return
   info 'Optional Google Apps Script settings. Press Enter to accept each default.'
   prompt_string_config drive_output_folder_url 'Output folder URL (blank uses My Drive/Tricount-Exporter)' ''
-  prompt_string_config processed_label_name 'Processed Gmail label' 'Tricount-Exporter/Imported'
-  prompt_string_config notification_email 'Notification email (blank uses the installing account)' ''
+  prompt_string_config processed_label_name 'Exported Gmail label' 'Tricount-Exporter/Exported'
+  prompt_string_config notification_email 'Notification email (blank disables notifications)' ''
   prompt_boolean_config archive_processed_threads 'Archive successfully processed threads' true
   prompt_boolean_config send_success_notification 'Send a success notification email' true
   prompt_number_config run_interval_hours 'Polling interval in hours' 12

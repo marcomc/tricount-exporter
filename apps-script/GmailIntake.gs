@@ -173,7 +173,7 @@ function archiveThreeCountProcessedThread_(thread, config) {
 
 function getOrCreateThreeCountProcessedLabel_(config) {
   const name = String(config.processed_label_name ||
-    'Tricount-Exporter/Imported').trim();
+    'Tricount-Exporter/Exported').trim();
   if (!name) {
     throw new Error('Automation configuration requires processed_label_name.');
   }
@@ -186,7 +186,9 @@ function isThreeCountInvitationSubject_(subject) {
 }
 
 function isThreeCountGeneratedNotification_(subject) {
-  return /^\[tricount-exporter\]\s+imported:/i.test(String(subject || '').trim());
+  return /^\[tricount-exporter\]\s+(?:exported|imported):/i.test(
+    String(subject || '').trim()
+  );
 }
 
 function extractThreeCountShareUrls_(body) {

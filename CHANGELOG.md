@@ -2,12 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
-## [0.3.1] - 2026-09-08 - Apps Script importer improvements
+## [0.3.1] - 2026-09-08 - Apps Script exporter improvements
 
-- Add safety guidelines for Apps Script importer and enhance transaction handling to the AGENTS.md file.
+- Add safety guidelines for the Apps Script exporter and enhance transaction handling to the AGENTS.md file.
 
 ### Fixed
 
+- Renamed the Apps Script processed-mail label and success notifications from
+  `Imported` to `Exported`, while continuing to ignore legacy notification
+  subjects during Gmail discovery.
 - Made contributor validation reuse an existing local virtualenv instead of
   failing on an unrelated older system `python3`.
 - Made success notifications non-blocking when the recipient is unavailable or
