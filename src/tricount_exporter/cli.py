@@ -1,4 +1,5 @@
 from __future__ import annotations
+from decimal import DivisionByZero
 
 import argparse
 import csv
@@ -520,6 +521,10 @@ class TricountHandler:
             category = TricountHandler.effective_category(transaction)
         if type_transaction == "INCOME":
             paid_for = [-amount for amount in paid_for]
+        try:
+            rate = 1/ float(transaction["Exchange Rate"])
+        except (ValueError, TypeError, DivisionByZero):
+            rate = 1
 
         return [
             TricountHandler.transaction_datetime(transaction["When"]).strftime("%Y-%m-%d"),
@@ -528,7 +533,7 @@ class TricountHandler:
             *paid_for,
             transaction["Local Currency"],
             category,
-            transaction["Exchange Rate"],
+            rate,
         ]
 
     @staticmethod
